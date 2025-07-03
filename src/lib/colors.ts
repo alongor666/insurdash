@@ -4,32 +4,43 @@
 // Red (hsl(0, 80%, 50%)) for VCR >= 130%
 // Purple (hsl(280, 80%, 55%)) for VCR >= 160%
 export function getDynamicColorByVCR(vcr: number): string {
-  if (vcr <= 70) {
-    return 'hsl(140, 80%, 40%)'; // Healthy Green
+    // Healthy Zone: <= 85% (Green)
+    // Below 90%, the lower the value, the darker the color.
+    if (vcr <= 85) {
+      // Range from 85 down to 50 for max darkness
+      const percentage = Math.max(0, (85 - vcr) / (85 - 50));
+      const lightness = 40 - 15 * percentage; // from 40% down to 25%
+      return `hsl(140, 80%, ${lightness}%)`;
+    }
+    // Caution Zone: 85% < VCR <= 90% (Blue)
+    // The closer to 85, the healthier/darker.
+    if (vcr <= 90) {
+      const percentage = (vcr - 85) / 5; // 0 at 85, 1 at 90
+      const lightness = 45 - 15 * (1 - percentage); // from 45% down to 30%
+      return `hsl(210, 80%, ${lightness}%)`;
+    }
+    
+    // High-risk zones: > 90%
+    // Above 90%, the higher the value, the darker the color.
+  
+    // Warning Zone: 90% < VCR <= 94% (Yellow)
+    if (vcr <= 94) {
+      const percentage = (vcr - 90) / 4;
+      const lightness = 50 - 15 * percentage; // from 50% down to 35%
+      return `hsl(60, 80%, ${lightness}%)`;
+    }
+    // Danger Zone: 94% < VCR <= 100% (Red)
+    if (vcr <= 100) {
+      const percentage = (vcr - 94) / 6;
+      const lightness = 50 - 15 * percentage; // from 50% down to 35%
+      return `hsl(0, 80%, ${lightness}%)`;
+    }
+    // Catastrophic Zone: > 100% (Purple-Red)
+    // Cap at VCR 130 for max darkness
+    const percentage = Math.min(1, (vcr - 100) / 30);
+    const lightness = 55 - 20 * percentage; // from 55% down to 35%
+    return `hsl(330, 80%, ${lightness}%)`;
   }
-  if (vcr <= 100) {
-    // Interpolate from Green to Yellow
-    const percentage = (vcr - 70) / (100 - 70);
-    const hue = 140 - (140 - 60) * percentage;
-    const lightness = 40 + (45 - 40) * percentage;
-    return `hsl(${hue}, 80%, ${lightness}%)`;
-  }
-  if (vcr <= 130) {
-    // Interpolate from Yellow to Red
-    const percentage = (vcr - 100) / (130 - 100);
-    const hue = 60 - 60 * percentage;
-    const lightness = 45 + (50 - 45) * percentage;
-    return `hsl(${hue}, 80%, ${lightness}%)`;
-  }
-  if (vcr <= 160) {
-    // Interpolate from Red to Purple
-    const percentage = (vcr - 130) / (160 - 130);
-    const hue = 360 - (360 - 280) * percentage; // Hue for red is 0 or 360
-    const lightness = 50 + (55 - 50) * percentage;
-    return `hsl(${hue}, 80%, ${lightness}%)`;
-  }
-  return 'hsl(280, 80%, 55%)'; // High-risk Purple
-}
 
 
 export function getDynamicColorForDonutLegend(outerRatio: number, innerRatio: number, ring: 'inner' | 'outer'): string {

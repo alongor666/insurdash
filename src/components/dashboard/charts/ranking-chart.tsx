@@ -27,7 +27,7 @@ export default function RankingChart({ data }: RankingChartProps) {
     return (
         <div className="space-y-4">
             <div className="w-full sm:w-1/3">
-                <CardDescription>选择排名指标</CardDescription>
+                <CardDescription>选择分布指标</CardDescription>
                 <Select value={selectedKpi} onValueChange={(value) => setSelectedKpi(value as KpiKey)}>
                     <SelectTrigger>
                         <SelectValue placeholder="选择指标" />

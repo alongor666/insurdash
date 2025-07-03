@@ -60,7 +60,7 @@ export default function ChartsSection({ processedData, trendData }: ChartsSectio
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 mb-4">
             <TabsTrigger value="trend">趋势分析</TabsTrigger>
             <TabsTrigger value="donut">占比分析</TabsTrigger>
-            <TabsTrigger value="ranking">业务排名</TabsTrigger>
+            <TabsTrigger value="ranking">业务分布</TabsTrigger>
             <TabsTrigger value="bubble">多维气泡</TabsTrigger>
             <TabsTrigger value="pareto">帕累托</TabsTrigger>
         </TabsList>
@@ -75,7 +75,7 @@ export default function ChartsSection({ processedData, trendData }: ChartsSectio
             </ChartWrapper>
         </TabsContent>
          <TabsContent value="ranking">
-            <ChartWrapper title="业务排名" description="通过可排序的水平条形图，对所有业务线按选定指标排名。">
+            <ChartWrapper title="业务分布" description="通过可排序的水平条形图，对所有业务线按选定指标进行分布展示。">
                 <RankingChart data={chartData} />
             </ChartWrapper>
         </TabsContent>
