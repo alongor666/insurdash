@@ -21,11 +21,8 @@ const LegendTable = ({ data, innerMetric, outerMetric }: { data: any[], innerMet
     const totalInner = innerMetric !== 'none' ? data.reduce((sum, item) => sum + item.kpis[innerMetric], 0) : 0;
     const totalOuter = outerMetric !== 'none' ? data.reduce((sum, item) => sum + item.kpis[outerMetric], 0) : 0;
     
-    const sortedData = [...data].sort((a, b) => {
-        if (outerMetric !== 'none') return b.kpis[outerMetric] - a.kpis[outerMetric];
-        if (innerMetric !== 'none') return b.kpis[innerMetric] - a.kpis[innerMetric];
-        return 0;
-    });
+    // Data is now pre-sorted
+    const sortedData = data;
 
     const half = Math.ceil(sortedData.length / 2);
     const firstHalf = sortedData.slice(0, half);
@@ -86,11 +83,17 @@ export default function DonutChart({ data }: DonutChartProps) {
     const [innerMetric, setInnerMetric] = useState<KpiKey | 'none'>('total_loss_amount');
     
     const chartData = useMemo(() => {
-        return data.map(d => ({
+        const sortedData = [...data].sort((a, b) => {
+            if (outerMetric !== 'none') return b.kpis[outerMetric] - a.kpis[outerMetric];
+            if (innerMetric !== 'none') return b.kpis[innerMetric] - a.kpis[innerMetric];
+            return 0;
+        });
+        
+        return sortedData.map(d => ({
             ...d,
             color: getDynamicColorByVCR(d.kpis.variable_cost_ratio)
-        }))
-    }, [data])
+        }));
+    }, [data, outerMetric, innerMetric]);
 
     if (innerMetric === 'none' && outerMetric === 'none') {
         return (
@@ -142,6 +145,7 @@ export default function DonutChart({ data }: DonutChartProps) {
                                     innerRadius={innerMetric !== 'none' ? "70%" : "40%"}
                                     outerRadius="90%"
                                     paddingAngle={1}
+                                    isAnimationActive={false}
                                 >
                                     {chartData.map((entry, index) => (
                                         <Cell key={`cell-outer-${index}`} fill={entry.color} stroke={entry.color} />
@@ -158,6 +162,7 @@ export default function DonutChart({ data }: DonutChartProps) {
                                     outerRadius="60%"
                                     innerRadius="40%"
                                     paddingAngle={1}
+                                    isAnimationActive={false}
                                 >
                                     {chartData.map((entry, index) => (
                                         <Cell key={`cell-inner-${index}`} fill={entry.color} stroke={entry.color} />
