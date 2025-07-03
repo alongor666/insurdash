@@ -31,7 +31,7 @@ function getLocalFilterOptions(): { periods: { id: string; name: string }[]; bus
 }
 
 function getLocalRawDataForPeriod(periodId: string): RawBusinessData[] {
-    return sampleData.filter(item => item.period_id === periodId) as RawBusinessData[];
+    return sampleData.filter(item => item.period_id === periodId);
 }
 
 function getLocalRawDataForTrend(endPeriodId: string, count: number) {
