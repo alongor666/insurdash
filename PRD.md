@@ -68,20 +68,20 @@
 graph TD  
     subgraph "云端开发环境 (Cloud IDE)"  
         A\[👨‍💻 开发者 on Project IDX\]  
-        A \-- "1. 编码 & 实时预览" \--\> B(IDX Web Preview)  
-        B \-- "2. 开发数据交互" \--\> C\[☁️ Supabase (开发实例)\]  
-        A \-- "3. git push" \--\> D\[GitHub 仓库\]  
+        A \-- "1. 编码 & 实时预览" --\> B(IDX Web Preview)  
+        B \-- "2. 开发数据交互" --\> C\[☁️ Supabase (开发实例)\]  
+        A \-- "3. git push" --\> D\[GitHub 仓库\]  
     end
 
     subgraph "自动化部署管道 (CI/CD)"  
-        D \-- "4. 触发 on main branch" \--\> E{🤖 GitHub Actions}  
-        E \-- "5. 构建静态产物" \--\> F\[Build Artifacts (out/)\]  
-        F \-- "6. 安全部署" \--\> G\[🌍 Cloudflare Pages\]  
+        D \-- "4. 触发 on main branch" --\> E{🤖 GitHub Actions}  
+        E \-- "5. 构建静态产物" --\> F\[Build Artifacts (out/)\]  
+        F \-- "6. 安全部署" --\> G\[🌍 Cloudflare Pages\]  
     end
 
     subgraph "全球用户访问 (Production)"  
-        H\[👩‍💼 全球用户浏览器\] \-- "7. 访问应用" \--\> G  
-        H \-- "8. 生产数据交互" \--\> I\[☁️ Supabase (生产实例)\]  
+        H\[👩‍💼 全球用户浏览器\] \-- "7. 访问应用" --\> G  
+        H \-- "8. 生产数据交互" --\> I\[☁️ Supabase (生产实例)\]  
     end
 
     style A fill:\#4285F4,stroke:\#fff,stroke-width:2px,color:\#fff  
@@ -434,6 +434,22 @@ jobs:
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
           branch: main
 ```
+
+### **5.3. 部署失败排查 (Troubleshooting)**
+
+如果您的 GitHub Actions 部署失败，请对照以下常见错误进行排查：
+
+*   **错误信息**: `Error: Input required and not supplied: projectName`
+    *   **根本原因**: GitHub 仓库的 Secrets 中缺少 `CF_PROJECT_NAME`，或者该 Secret 的值为空。
+    *   **解决方案**: 请严格按照 **5.1 节** 的指引，在 `Settings > Security > Secrets and variables > Actions` 中，创建名为 `CF_PROJECT_NAME` 的 Secret，并填入您在 Cloudflare Pages 上创建的**项目名称**。
+
+*   **错误信息**: `Error: Failed to get Pages project, API returned non-200` (通常伴有 404 Not Found)
+    *   **根本原因**: 提供的 `CF_ACCOUNT_ID` 或 `CF_PROJECT_NAME` 不正确，导致 Cloudflare API 无法找到您的项目。
+    *   **解决方案**:
+        1.  返回 Cloudflare 仪表盘。
+        2.  在主页右侧，**完整复制**您的 **Account ID**，并更新 `CF_ACCOUNT_ID` Secret。
+        3.  进入 Pages 项目的设置页面，**完整复制**页面上显示的**项目名称 (Project name)**，并更新 `CF_PROJECT_NAME` Secret。
+        4.  **请勿手动输入这些值**，务必使用复制粘贴，以避免拼写或大小写错误。
 
 ## **6\. 附录：核心指标字典 (指标血缘地图)**
 
