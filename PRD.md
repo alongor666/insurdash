@@ -386,50 +386,48 @@ graph TD
 
 在您的项目根目录 .github/workflows/ 下，创建 deploy.yml 文件，并粘贴以下内容：
 
-\# .github/workflows/deploy.yml  
+```yaml
+# .github/workflows/deploy.yml
 name: Deploy to Cloudflare Pages
 
-on:  
-  push:  
-    branches:  
-      \- main
+on:
+  push:
+    branches:
+      - main
 
-jobs:  
-  publish:  
-    runs-on: ubuntu-latest  
-    permissions:  
-      contents: read  
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
       deployments: write
 
-    steps:  
-      \- name: Checkout  
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
 
-      \- name: Setup Node.js  
-        uses: actions/setup-node@v4  
-        with:  
-          node-version: '20'  
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
           cache: 'npm'
 
-      \- name: Install Dependencies  
+      - name: Install Dependencies
         run: npm ci
 
-      \- name: Build Project  
-        run: npm run build  
-        env:  
-          NEXT\_PUBLIC\_SUPABASE\_URL: ${{ secrets.SUPABASE\_URL }}  
-          NEXT\_PUBLIC\_SUPABASE\_ANON\_KEY: ${{ secrets.SUPABASE\_ANON\_KEY }}
+      - name: Build Project
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
-      \- name: Publish to Cloudflare Pages  
-        uses: cloudflare/wrangler-action@v3  
-        with:  
-          apiToken: ${{ secrets.CF\_API\_TOKEN }}  
-          accountId: ${{ secrets.CF\_ACCOUNT\_ID }}  
-          projectName: 'insurdash' \# 替换为您的 Cloudflare Pages 项目名称  
-          directory: 'out' \# 对于 Next.js 静态导出，目录是 'out'  
-          branch: 'main'
-
-
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy out --project-name=insurdash --branch=main
+```
 
 ## **6\. 附录：核心指标字典 (指标血缘地图)**
 

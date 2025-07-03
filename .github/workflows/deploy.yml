@@ -37,6 +37,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          projectName: 'insurdash' # 替换为您的 Cloudflare Pages 项目名称
-          directory: 'out' # 对于 Next.js 静态导出，目录是 'out'
-          branch: 'main'
+          command: pages deploy out --project-name=insurdash --branch=main
