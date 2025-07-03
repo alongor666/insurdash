@@ -26,7 +26,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isSupabaseConfigured = !!supabase;
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
+    // If supabase is not configured, stop loading and do nothing.
+    if (!supabase) {
         setLoading(false);
         return;
     }
@@ -43,7 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [isSupabaseConfigured]);
+  }, []);
 
   useEffect(() => {
     if (loading) return; // Wait until the initial auth check is complete
@@ -63,11 +64,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = {
     user,
     login: (email: string, pass: string) => {
-        if (!isSupabaseConfigured) throw new Error("Supabase not configured");
+        if (!supabase) throw new Error("Supabase not configured");
         return supabase.auth.signInWithPassword({ email, password: pass });
     },
     logout: async () => {
-        if (!isSupabaseConfigured) throw new Error("Supabase not configured");
+        if (!supabase) throw new Error("Supabase not configured");
         // The listener will handle user state change and redirect.
         await supabase.auth.signOut();
     },
