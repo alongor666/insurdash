@@ -2,40 +2,36 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
 import AuthForm from '@/components/auth/auth-form';
-import { Car, BarChart3 } from 'lucide-react';
+import { BarChart3, Eye } from 'lucide-react';
 
 export default function LoginPage() {
+  const { user, isSupabaseConfigured } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!supabase) {
-      // Supabase is not configured, so we can't check for an active session.
-      // The auth form will be disabled automatically.
-      return;
+    if (user) {
+      router.push('/');
     }
-
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        router.push('/');
-      }
-    };
-    checkSession();
-  }, [router]);
+  }, [user, router]);
 
   return (
     <div className="min-h-screen w-full bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center items-center gap-3 mb-8">
             <div className="bg-primary p-3 rounded-lg text-primary-foreground">
-                <BarChart3 className="w-8 h-8" />
+                <Eye className="w-8 h-8" />
             </div>
           <h1 className="text-3xl font-bold text-foreground">
-            InsurDash 洞察
+            车险经营指标周趋势
           </h1>
         </div>
+        {!isSupabaseConfigured && (
+            <div className="bg-destructive/10 border border-destructive text-destructive p-3 rounded-md mb-4 text-center text-sm">
+                后端服务未配置。请检查您的环境变量。
+            </div>
+        )}
         <AuthForm />
       </div>
     </div>

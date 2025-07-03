@@ -1,60 +1,30 @@
 "use client"
 
 import KpiCard from './kpi-card';
-import { kpiDetails, type BusinessLineData, type KpiKey } from '@/lib/types';
-import { useMemo } from 'react';
+import { KPI_GRID_LAYOUT, KPIS } from '@/lib/kpi-config';
+import type { DashboardData } from '@/lib/types';
 
 interface KpiCardGridProps {
-  currentData: BusinessLineData[];
-  compareData: BusinessLineData[];
+  processedData: DashboardData;
 }
 
-// Helper to safely sum values
-const sum = (data: BusinessLineData[], key: KpiKey) => 
-  data.reduce((acc, item) => acc + (item[key] || 0), 0);
-
-// Helper to calculate weighted average for percentages
-const weightedAverage = (data: BusinessLineData[], key: KpiKey, weightKey: KpiKey = 'premiumIncome') => {
-    const totalWeight = sum(data, weightKey);
-    if (totalWeight === 0) return 0;
-    const weightedSum = data.reduce((acc, item) => acc + (item[key] || 0) * (item[weightKey] || 0), 0);
-    return weightedSum / totalWeight;
-};
-
-export default function KpiCardGrid({ currentData, compareData }: KpiCardGridProps) {
-    
-    const aggregatedData = useMemo(() => {
-        return Object.keys(kpiDetails).reduce((acc, key) => {
-            const k = key as KpiKey;
-            const { unit } = kpiDetails[k];
-            if (unit === '%') {
-                acc[k] = {
-                    current: weightedAverage(currentData, k),
-                    compare: weightedAverage(compareData, k),
-                };
-            } else {
-                 acc[k] = {
-                    current: sum(currentData, k),
-                    compare: sum(compareData, k),
-                };
-            }
-            return acc;
-        }, {} as Record<KpiKey, { current: number, compare: number }>);
-
-    }, [currentData, compareData]);
-
-
+export default function KpiCardGrid({ processedData }: KpiCardGridProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4 xl:grid-cols-4">
-      {(Object.keys(kpiDetails) as KpiKey[]).slice(0, 16).map((key) => {
-        const details = kpiDetails[key];
-        const data = aggregatedData[key];
+      {KPI_GRID_LAYOUT.map((kpiId) => {
+        if (!kpiId) return <div key={Math.random()} />; // Placeholder for empty grid cells
+        
+        const details = KPIS[kpiId];
+        const currentData = processedData.summary.current.kpis[kpiId];
+        const compareData = processedData.summary.compare.kpis[kpiId];
+
         return (
           <KpiCard
-            key={key}
+            key={kpiId}
+            kpiId={kpiId}
             title={details.name}
-            value={data.current}
-            previousValue={data.compare}
+            value={currentData}
+            previousValue={compareData}
             unit={details.unit}
           />
         );

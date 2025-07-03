@@ -1,42 +1,46 @@
-import { supabase } from './supabase/client';
-import type { BusinessLineData, Period, BusinessLine } from './types';
 
-export async function getFilterOptions(): Promise<{ periods: Period[], businessLines: BusinessLine[] }> {
-    if (!supabase) return { periods: [], businessLines: [] };
+import { supabase } from './supabase/client';
+import type { RawBusinessData } from './types';
+
+export async function getFilterOptions(): Promise<{ periods: { id: string, name: string }[], businessTypes: string[] }> {
+    if (!supabase) return { periods: [], businessTypes: [] };
     
-    // Removing .order() to prevent potential performance issues on large tables.
-    // Sorting will be handled in the client-side code.
     const { data, error } = await supabase
         .from('business_data')
-        .select('period_id, period_name, business_line_id, business_line_name');
+        .select('period_id, period_label, business_type');
 
     if (error) {
         console.error('Error fetching filter options:', error);
         throw error;
     }
 
-    const periodMap = new Map<string, Period>();
-    const businessLineMap = new Map<string, BusinessLine>();
+    if (!data) {
+        return { periods: [], businessTypes: [] };
+    }
+
+    const periodMap = new Map<string, string>();
+    const businessTypeSet = new Set<string>();
 
     data.forEach(item => {
-        if (item.period_id && item.period_name && !periodMap.has(item.period_id)) {
-            periodMap.set(item.period_id, { id: item.period_id, name: item.period_name });
+        if (item.period_id && item.period_label) {
+            periodMap.set(item.period_id, item.period_label);
         }
-        if (item.business_line_id && item.business_line_name && !businessLineMap.has(item.business_line_id)) {
-            businessLineMap.set(item.business_line_id, { id: item.business_line_id, name: item.business_line_name });
+        if (item.business_type) {
+            businessTypeSet.add(item.business_type);
         }
     });
 
-    const uniquePeriods = Array.from(periodMap.values())
-        .sort((a, b) => b.name.localeCompare(a.name)); // Sort descending to get latest first
+    const periods = Array.from(periodMap.entries())
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => b.id.localeCompare(a.id)); // Sort by ID desc (e.g., 2025-W26 before 2025-W25)
     
-    const uniqueBusinessLines = Array.from(businessLineMap.values());
+    const businessTypes = Array.from(businessTypeSet).sort();
     
-    return { periods: uniquePeriods, businessLines: uniqueBusinessLines };
+    return { periods, businessTypes };
 }
 
-export async function getDashboardData(periodId: string): Promise<BusinessLineData[]> {
-    if (!supabase) return [];
+export async function getRawDataForPeriod(periodId: string): Promise<RawBusinessData[]> {
+    if (!supabase || !periodId) return [];
     
     const { data, error } = await supabase
         .from('business_data')
@@ -44,20 +48,88 @@ export async function getDashboardData(periodId: string): Promise<BusinessLineDa
         .eq('period_id', periodId);
         
     if (error) {
-        console.error('Error fetching dashboard data:', error);
+        console.error(`Error fetching data for period ${periodId}:`, error);
         throw error;
     }
     
-    return data.map(item => ({
-        id: item.business_line_id,
-        name: item.business_line_name,
-        premiumIncome: item.premium_income,
-        payoutRate: item.payout_rate,
-        comprehensiveCostRate: item.comprehensive_cost_rate,
-        newPolicies: item.new_policies,
-        renewalRate: item.renewal_rate,
-        customerAcquisitionCost: item.customer_acquisition_cost,
-        averageClaimCost: item.average_claim_cost,
-        claimFrequency: item.claim_frequency,
-    }));
+    return data as RawBusinessData[];
+}
+
+
+export async function getRawDataForTrend(
+    endPeriodId: string,
+    count: number
+): Promise<{ period_id: string, period_label: string, current: RawBusinessData[], previous: RawBusinessData[] }[]> {
+    if (!supabase || !endPeriodId) return [];
+
+    const { data: periodIdsData, error: idsError } = await supabase
+        .from('business_data')
+        .select('period_id, comparison_period_id_mom')
+        .eq('period_id', endPeriodId)
+        .limit(1);
+
+    if (idsError || !periodIdsData || periodIdsData.length === 0) {
+        console.error('Could not fetch start period for trend', idsError);
+        return [];
+    }
+
+    let allPeriodIds = new Set<string>();
+    let currentId = endPeriodId;
+    
+    // This is not efficient, but it's the only way with the current schema
+    // A proper date or integer column for periods would be better.
+    const { data: allPeriods, error: allPeriodsError } = await supabase
+        .from('business_data')
+        .select('period_id')
+        .order('period_id', { ascending: false });
+
+    if(allPeriodsError || !allPeriods) {
+        return [];
+    }
+    const sortedPeriodIds = [...new Set(allPeriods.map(p => p.period_id))];
+    const startIndex = sortedPeriodIds.indexOf(endPeriodId);
+    if(startIndex === -1) return [];
+
+    const trendPeriodIds = sortedPeriodIds.slice(startIndex, startIndex + count + 1);
+
+
+    const { data: trendData, error: trendError } = await supabase
+        .from('business_data')
+        .select('*')
+        .in('period_id', trendPeriodIds);
+
+    if (trendError) {
+        console.error('Error fetching trend data:', trendError);
+        return [];
+    }
+    
+    const dataByPeriod = trendData.reduce((acc, row) => {
+        if (!acc[row.period_id]) {
+            acc[row.period_id] = [];
+        }
+        acc[row.period_id].push(row as RawBusinessData);
+        return acc;
+    }, {} as Record<string, RawBusinessData[]>);
+    
+    const result = [];
+    for(let i = 0; i < count; i++) {
+        const currentPeriodId = sortedPeriodIds[startIndex + i];
+        const previousPeriodId = sortedPeriodIds[startIndex + i + 1];
+
+        if(!currentPeriodId || !previousPeriodId) break;
+
+        const current = dataByPeriod[currentPeriodId] || [];
+        const previous = dataByPeriod[previousPeriodId] || [];
+        
+        if (current.length > 0) {
+             result.push({
+                period_id: currentPeriodId,
+                period_label: current[0].period_label,
+                current,
+                previous
+             })
+        }
+    }
+    
+    return result.reverse();
 }

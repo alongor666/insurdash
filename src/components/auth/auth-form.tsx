@@ -1,16 +1,15 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 import { Loader2, LogIn } from 'lucide-react';
 
 const loginSchema = z.object({
@@ -21,10 +20,9 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function AuthForm() {
-  const router = useRouter();
+  const { login, isSupabaseConfigured } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const isSupabaseConfigured = !!supabase;
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -35,19 +33,8 @@ export default function AuthForm() {
   });
 
   const handleLogin = async (values: LoginFormValues) => {
-    if (!isSupabaseConfigured) {
-      toast({
-        title: '配置错误',
-        description: 'Supabase未配置，无法登录。请检查环境变量。',
-        variant: 'destructive',
-      });
-      return;
-    }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: values.email,
-      password: values.password,
-    });
+    const { error } = await login(values.email, values.password);
 
     if (error) {
       toast({
@@ -60,8 +47,7 @@ export default function AuthForm() {
         title: '登录成功',
         description: '正在跳转到仪表盘...',
       });
-      router.push('/');
-      router.refresh();
+      // The redirect is handled by the auth provider
     }
     setLoading(false);
   };
@@ -73,7 +59,7 @@ export default function AuthForm() {
         <CardDescription>
           {isSupabaseConfigured
             ? '请输入您的凭据以访问仪表盘。'
-            : 'Supabase未配置，登录功能已禁用。'}
+            : '登录功能已禁用，服务未配置。'}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -110,7 +96,7 @@ export default function AuthForm() {
             ) : (
               <LogIn className="mr-2 h-4 w-4" />
             )}
-            安全登录
+            {loading ? "登录中..." : !isSupabaseConfigured ? "服务未配置" : "登录"}
           </Button>
         </form>
       </CardContent>

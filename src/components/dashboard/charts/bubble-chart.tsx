@@ -1,86 +1,117 @@
+
 "use client"
 
 import { useState } from 'react';
-import { Scatter, ScatterChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, ZAxis, Cell } from "recharts"
+import { Scatter, ScatterChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, ZAxis, Label } from "recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
-import { kpiDetails, type KpiKey, type BusinessLineData } from '@/lib/types';
-import { Label } from '@/components/ui/label';
+import { ChartContainer } from '@/components/ui/chart';
+import { KPIS } from '@/lib/kpi-config';
+import type { KpiKey, ProcessedBusinessData } from '@/lib/types';
+import { getDynamicColorByVCR } from '@/lib/colors';
+import { formatKpiValue } from '@/lib/data-utils';
+import { CardDescription } from '@/components/ui/card';
 
 interface BubbleChartProps {
-    data: BusinessLineData[];
+    data: ProcessedBusinessData[];
 }
 
-const chartableKpis = (Object.keys(kpiDetails) as KpiKey[]);
+const chartableKpis = Object.keys(KPIS) as KpiKey[];
 
-const COLORS = [
-    "hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))",
-    "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(224, 64%, 72%)",
-    "hsl(187, 95%, 83%)",
-];
+const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        const xKpi = KPIS[data.xKpi as KpiKey];
+        const yKpi = KPIS[data.yKpi as KpiKey];
+        const zKpi = KPIS[data.zKpi as KpiKey];
+
+        return (
+            <div className="rounded-lg border bg-background p-2 shadow-sm">
+                <div className="grid grid-cols-1 gap-2">
+                    <p className="text-sm font-bold text-foreground">{data.business_type}</p>
+                    <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">{xKpi.name} (X)</p>
+                        <p className="text-xs font-medium">{formatKpiValue(data.x, xKpi.unit)}</p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">{yKpi.name} (Y)</p>
+                        <p className="text-xs font-medium">{formatKpiValue(data.y, yKpi.unit)}</p>
+                    </div>
+                     <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">{zKpi.name} (大小)</p>
+                        <p className="text-xs font-medium">{formatKpiValue(data.z, zKpi.unit)}</p>
+                    </div>
+                     <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">{KPIS['variable_cost_ratio'].name}</p>
+                        <p className="text-xs font-medium" style={{color: getDynamicColorByVCR(data.kpis.variable_cost_ratio)}}>
+                            {formatKpiValue(data.kpis.variable_cost_ratio, '%')}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
 
 export default function BubbleChart({ data }: BubbleChartProps) {
-    const [xMetric, setXMetric] = useState<KpiKey>('payoutRate');
-    const [yMetric, setYMetric] = useState<KpiKey>('comprehensiveCostRate');
-    const [zMetric, setZMetric] = useState<KpiKey>('premiumIncome');
+    const [xMetric, setXMetric] = useState<KpiKey>('marginal_contribution_ratio');
+    const [yMetric, setYMetric] = useState<KpiKey>('premium_written');
+    const [zMetric, setZMetric] = useState<KpiKey>('policy_count');
 
     const chartData = data.map(d => ({
         ...d,
-        x: d[xMetric],
-        y: d[yMetric],
-        z: d[zMetric],
+        x: d.kpis[xMetric],
+        y: d.kpis[yMetric],
+        z: d.kpis[zMetric],
+        xKpi: xMetric,
+        yKpi: yMetric,
+        zKpi: zMetric,
+        fill: getDynamicColorByVCR(d.kpis.variable_cost_ratio),
     }));
 
-    const xDetails = kpiDetails[xMetric];
-    const yDetails = kpiDetails[yMetric];
-    
-    const chartConfig = data.reduce((acc, item, index) => {
-        acc[item.name] = {
-            label: item.name,
-            color: COLORS[index % COLORS.length]
-        };
-        return acc;
-    }, {} as any)
+    const xDetails = KPIS[xMetric];
+    const yDetails = KPIS[yMetric];
     
     return (
         <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1 space-y-1">
-                    <Label htmlFor="x-axis" className="text-sm font-medium">X轴指标</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                    <CardDescription>X轴指标</CardDescription>
                     <Select value={xMetric} onValueChange={(val) => setXMetric(val as KpiKey)}>
-                        <SelectTrigger id="x-axis"><SelectValue /></SelectTrigger>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                         {chartableKpis.map(kpi => (
-                            <SelectItem key={kpi} value={kpi}>{kpiDetails[kpi].name}</SelectItem>
+                            <SelectItem key={kpi} value={kpi}>{KPIS[kpi].name}</SelectItem>
                         ))}
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="flex-1 space-y-1">
-                    <Label htmlFor="y-axis" className="text-sm font-medium">Y轴指标</Label>
+                <div className="space-y-1">
+                    <CardDescription>Y轴指标</CardDescription>
                     <Select value={yMetric} onValueChange={(val) => setYMetric(val as KpiKey)}>
-                        <SelectTrigger id="y-axis"><SelectValue /></SelectTrigger>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                          {chartableKpis.map(kpi => (
-                            <SelectItem key={kpi} value={kpi}>{kpiDetails[kpi].name}</SelectItem>
+                            <SelectItem key={kpi} value={kpi}>{KPIS[kpi].name}</SelectItem>
                         ))}
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="flex-1 space-y-1">
-                    <Label htmlFor="z-axis" className="text-sm font-medium">气泡大小指标</Label>
+                <div className="space-y-1">
+                    <CardDescription>气泡大小</CardDescription>
                     <Select value={zMetric} onValueChange={(val) => setZMetric(val as KpiKey)}>
-                        <SelectTrigger id="z-axis"><SelectValue /></SelectTrigger>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                          {chartableKpis.map(kpi => (
-                            (kpiDetails[kpi].unit !== '%') && <SelectItem key={kpi} value={kpi}>{kpiDetails[kpi].name}</SelectItem>
+                            <SelectItem key={kpi} value={kpi}>{KPIS[kpi].name}</SelectItem>
                          ))}
                         </SelectContent>
                     </Select>
                 </div>
             </div>
             
-            <ChartContainer config={chartConfig} className="h-[450px] w-full">
+            <ChartContainer config={{}} className="h-[450px] w-full">
                 <ResponsiveContainer>
                     <ScatterChart margin={{ top: 20, right: 40, bottom: 40, left: 20 }}>
                         <CartesianGrid />
@@ -88,38 +119,24 @@ export default function BubbleChart({ data }: BubbleChartProps) {
                             type="number" 
                             dataKey="x" 
                             name={xDetails.name} 
-                            label={{ value: xDetails.name, position: 'insideBottom', offset: -25 }}
-                            tickFormatter={(value) => xDetails.unit === '%' ? `${Number(value).toFixed(1)}%` : value.toLocaleString()}
-                        />
+                            tickFormatter={(value) => formatKpiValue(value, xDetails.unit, true)}
+                            domain={['dataMin', 'dataMax']}
+                        >
+                            <Label value={xDetails.name} offset={-25} position="insideBottom" />
+                        </XAxis>
                         <YAxis 
                             type="number" 
                             dataKey="y" 
                             name={yDetails.name} 
                             width={80}
-                            label={{ value: yDetails.name, angle: -90, position: 'insideLeft' }}
-                            tickFormatter={(value) => yDetails.unit === '%' ? `${Number(value).toFixed(1)}%` : value.toLocaleString()}
-                        />
-                        <ZAxis type="number" dataKey="z" range={[60, 800]} name={kpiDetails[zMetric].name} />
-                        <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<ChartTooltipContent nameKey="name" />} />
-                        <Legend content={({ payload }) => {
-                            const chartPayload = (payload as any)?.[0]?.payload?.payload
-                            if (!chartPayload) return null
-                            return (
-                                <ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4">
-                                {chartPayload.map((entry: any) => (
-                                    <li key={`item-${entry.id}`} className="flex items-center gap-2">
-                                        <span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: chartConfig[entry.name]?.color}} />
-                                        <span className="text-sm text-muted-foreground">{entry.name}</span>
-                                    </li>
-                                ))}
-                                </ul>
-                            )
-                        }}/>
-                        <Scatter data={chartData} nameKey="name">
-                            {chartData.map((entry) => (
-                                <Cell key={`cell-${entry.id}`} fill={chartConfig[entry.name].color} />
-                            ))}
-                        </Scatter>
+                            tickFormatter={(value) => formatKpiValue(value, yDetails.unit, true)}
+                            domain={['auto', 'auto']}
+                        >
+                            <Label value={yDetails.name} angle={-90} position="insideLeft" />
+                        </YAxis>
+                        <ZAxis type="number" dataKey="z" range={[100, 1000]} name={KPIS[zMetric].name} />
+                        <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
+                        <Scatter data={chartData} />
                     </ScatterChart>
                 </ResponsiveContainer>
             </ChartContainer>

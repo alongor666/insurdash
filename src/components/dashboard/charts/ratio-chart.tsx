@@ -1,112 +1,205 @@
+
 "use client"
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Pie, PieChart, ResponsiveContainer, Cell, Legend, Tooltip } from "recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
-import { kpiDetails, type KpiKey, type BusinessLineData } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartContainer } from '@/components/ui/chart';
+import { KPIS, DONUT_PARETO_KPI_IDS } from '@/lib/kpi-config';
+import type { KpiKey, ProcessedBusinessData } from '@/lib/types';
+import { CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { formatKpiValue } from '@/lib/data-utils';
+import { getDynamicColorForDonutLegend } from '@/lib/colors';
 
-interface RatioChartProps {
-    data: BusinessLineData[];
+interface DonutChartProps {
+    data: ProcessedBusinessData[];
 }
 
-const chartableKpis = (Object.keys(kpiDetails) as KpiKey[]).filter(key => kpiDetails[key].unit !== '%');
+const LegendTable = ({ data, innerMetric, outerMetric }: { data: any[], innerMetric: KpiKey | 'none', outerMetric: KpiKey | 'none' }) => {
+    const totalInner = innerMetric !== 'none' ? data.reduce((sum, item) => sum + item.kpis[innerMetric], 0) : 0;
+    const totalOuter = outerMetric !== 'none' ? data.reduce((sum, item) => sum + item.kpis[outerMetric], 0) : 0;
+    
+    const sortedData = [...data].sort((a, b) => {
+        if (outerMetric !== 'none') return b.kpis[outerMetric] - a.kpis[outerMetric];
+        if (innerMetric !== 'none') return b.kpis[innerMetric] - a.kpis[innerMetric];
+        return 0;
+    });
 
-const COLORS = [
-    "hsl(var(--chart-1))",
-    "hsl(var(--chart-2))",
-    "hsl(var(--chart-3))",
-    "hsl(var(--chart-4))",
-    "hsl(var(--chart-5))",
-    "hsl(224, 64%, 72%)",
-    "hsl(187, 95%, 83%)",
-];
+    const half = Math.ceil(sortedData.length / 2);
+    const firstHalf = sortedData.slice(0, half);
+    const secondHalf = sortedData.slice(half);
 
-export default function RatioChart({ data }: RatioChartProps) {
-    const [innerMetric, setInnerMetric] = useState<KpiKey>('premiumIncome');
-    const [outerMetric, setOuterMetric] = useState<KpiKey>('newPolicies');
+    const renderTable = (dataset: any[]) => (
+        <Table className="text-xs">
+            <TableHeader>
+                <TableRow>
+                    <TableHead className="h-8">业务线</TableHead>
+                    {outerMetric !== 'none' && <TableHead className="text-right h-8">外环占比</TableHead>}
+                    {innerMetric !== 'none' && <TableHead className="text-right h-8">内环占比</TableHead>}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {dataset.map(item => {
+                    const outerValue = outerMetric !== 'none' ? item.kpis[outerMetric] : 0;
+                    const innerValue = innerMetric !== 'none' ? item.kpis[innerMetric] : 0;
+                    const outerRatio = totalOuter > 0 ? (outerValue / totalOuter) * 100 : 0;
+                    const innerRatio = totalInner > 0 ? (innerValue / totalInner) * 100 : 0;
 
-    const chartConfig = data.reduce((acc, item, index) => {
-        acc[item.name] = {
-            label: item.name,
-            color: COLORS[index % COLORS.length]
-        };
-        return acc;
-    }, {} as any)
+                    return (
+                        <TableRow key={item.business_type} className="h-8">
+                            <TableCell className="py-1 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full" style={{backgroundColor: item.color}}></div>
+                                {item.business_type}
+                            </TableCell>
+                            {outerMetric !== 'none' && 
+                                <TableCell className="py-1 text-right font-medium" style={{color: getDynamicColorForDonutLegend(outerRatio, innerRatio, 'outer')}}>
+                                    {formatKpiValue(outerRatio, '%')}
+                                </TableCell>
+                            }
+                             {innerMetric !== 'none' && 
+                                <TableCell className="py-1 text-right font-medium" style={{color: getDynamicColorForDonutLegend(outerRatio, innerRatio, 'inner')}}>
+                                    {formatKpiValue(innerRatio, '%')}
+                                </TableCell>
+                            }
+                        </TableRow>
+                    );
+                })}
+            </TableBody>
+        </Table>
+    );
 
     return (
-        <div className="space-y-4">
-             <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1 space-y-1">
-                    <label className="text-sm font-medium">内环指标</label>
-                    <Select value={innerMetric} onValueChange={(val) => setInnerMetric(val as KpiKey)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                        {chartableKpis.map(kpi => (
-                            <SelectItem key={kpi} value={kpi}>{kpiDetails[kpi].name}</SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
+        <ScrollArea className="h-full">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+                <div>{renderTable(firstHalf)}</div>
+                <div>{renderTable(secondHalf)}</div>
+            </div>
+        </ScrollArea>
+    );
+};
+
+
+export default function DonutChart({ data }: DonutChartProps) {
+    const [outerMetric, setOuterMetric] = useState<KpiKey | 'none'>('premium_written');
+    const [innerMetric, setInnerMetric] = useState<KpiKey | 'none'>('total_loss_amount');
+    
+    const chartData = useMemo(() => {
+        return data.map((d, i) => ({
+            ...d,
+            color: `hsl(var(--chart-${(i % 5) + 1}))`
+        }))
+    }, [data])
+
+    const outerData = outerMetric !== 'none' ? chartData.map(d => ({name: d.business_type, value: d.kpis[outerMetric], color: d.color})) : []
+    const innerData = innerMetric !== 'none' ? chartData.map(d => ({name: d.business_type, value: d.kpis[innerMetric], color: d.color})) : []
+
+    if (innerMetric === 'none' && outerMetric === 'none') {
+        return (
+            <div className="flex flex-col h-full">
+                <FilterControls innerMetric={innerMetric} setInnerMetric={setInnerMetric} outerMetric={outerMetric} setOuterMetric={setOuterMetric} />
+                <div className="flex-grow flex items-center justify-center text-muted-foreground">请至少选择一个指标</div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="flex flex-col h-full">
+             <FilterControls innerMetric={innerMetric} setInnerMetric={setInnerMetric} outerMetric={outerMetric} setOuterMetric={setOuterMetric} />
+            <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-4 items-center">
+                <div className="w-full h-[300px]">
+                    <ResponsiveContainer>
+                        <PieChart>
+                             <Tooltip 
+                                 content={({ active, payload }: any) => {
+                                    if (active && payload && payload.length) {
+                                        const { name, value, payload: itemPayload } = payload[0];
+                                        const kpiKey = itemPayload.dataKey.replace('kpis.', '');
+                                        const kpi = KPIS[kpiKey as KpiKey];
+                                        return (
+                                            <div className="rounded-lg border bg-background p-2 shadow-sm">
+                                                <div className="grid grid-cols-1 gap-2">
+                                                    <p className="text-sm font-bold text-foreground">{name}</p>
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-xs text-muted-foreground">{kpi.name}</p>
+                                                        <p className="text-xs font-medium ml-2">{formatKpiValue(value, kpi.unit)}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                }}
+                             />
+                            {outerMetric !== 'none' && 
+                                <Pie
+                                    data={chartData}
+                                    dataKey={`kpis.${outerMetric}`}
+                                    nameKey="business_type"
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={innerMetric !== 'none' ? "70%" : "40%"}
+                                    outerRadius="90%"
+                                    paddingAngle={1}
+                                >
+                                    {chartData.map((entry, index) => (
+                                        <Cell key={`cell-outer-${index}`} fill={entry.color} stroke={entry.color} />
+                                    ))}
+                                </Pie>
+                            }
+                            {innerMetric !== 'none' &&
+                                <Pie
+                                    data={chartData}
+                                    dataKey={`kpis.${innerMetric}`}
+                                    nameKey="business_type"
+                                    cx="50%"
+                                    cy="50%"
+                                    outerRadius="60%"
+                                    innerRadius="40%"
+                                    paddingAngle={1}
+                                >
+                                    {chartData.map((entry, index) => (
+                                        <Cell key={`cell-inner-${index}`} fill={entry.color} stroke={entry.color} />
+                                    ))}
+                                </Pie>
+                            }
+                        </PieChart>
+                    </ResponsiveContainer>
                 </div>
-                <div className="flex-1 space-y-1">
-                    <label className="text-sm font-medium">外环指标</label>
-                    <Select value={outerMetric} onValueChange={(val) => setOuterMetric(val as KpiKey)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                         {chartableKpis.map(kpi => (
-                            <SelectItem key={kpi} value={kpi}>{kpiDetails[kpi].name}</SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
+                 <div className="w-full h-[300px]">
+                    <LegendTable data={chartData} innerMetric={innerMetric} outerMetric={outerMetric} />
                 </div>
             </div>
-
-            <ChartContainer config={chartConfig} className="h-[400px] w-full">
-                <ResponsiveContainer>
-                    <PieChart>
-                        <Tooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                        <Pie
-                            data={data}
-                            dataKey={innerMetric}
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius="60%"
-                            innerRadius="40%"
-                        >
-                            {data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={chartConfig[entry.name]?.color} />
-                            ))}
-                        </Pie>
-                        <Pie
-                            data={data}
-                            dataKey={outerMetric}
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            innerRadius="70%"
-                            outerRadius="90%"
-                        >
-                             {data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={chartConfig[entry.name]?.color} />
-                            ))}
-                        </Pie>
-                        <Legend content={({ payload }) => {
-                            return (
-                                <ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4">
-                                {payload?.map((entry, index) => (
-                                    <li key={`item-${index}`} className="flex items-center gap-2">
-                                        <span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: entry.color}} />
-                                        <span className="text-sm text-muted-foreground">{entry.value}</span>
-                                    </li>
-                                ))}
-                                </ul>
-                            )
-                        }}/>
-                    </PieChart>
-                </ResponsiveContainer>
-            </ChartContainer>
         </div>
     )
 }
+
+const FilterControls = ({innerMetric, setInnerMetric, outerMetric, setOuterMetric}: any) => (
+    <div className="flex flex-col sm:flex-row gap-4 mb-4">
+        <div className="flex-1 space-y-1">
+            <CardDescription>外环指标</CardDescription>
+            <Select value={outerMetric} onValueChange={(val) => setOuterMetric(val as KpiKey | 'none')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                <SelectItem value="none">无</SelectItem>
+                {DONUT_PARETO_KPI_IDS.map(kpi => (
+                    <SelectItem key={kpi} value={kpi}>{KPIS[kpi].name}</SelectItem>
+                ))}
+                </SelectContent>
+            </Select>
+        </div>
+        <div className="flex-1 space-y-1">
+            <CardDescription>内环指标</CardDescription>
+            <Select value={innerMetric} onValueChange={(val) => setInnerMetric(val as KpiKey | 'none')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                <SelectItem value="none">无</SelectItem>
+                {DONUT_PARETO_KPI_IDS.map(kpi => (
+                    <SelectItem key={kpi} value={kpi}>{KPIS[kpi].name}</SelectItem>
+                ))}
+                </SelectContent>
+            </Select>
+        </div>
+    </div>
+)

@@ -1,35 +1,70 @@
-export type BusinessLineData = {
-  id: string;
-  name: string;
-  premiumIncome: number;
-  payoutRate: number;
-  comprehensiveCostRate: number;
-  newPolicies: number;
-  renewalRate: number;
-  customerAcquisitionCost: number;
-  averageClaimCost: number;
-  claimFrequency: number;
+// This file is the single source of truth for shared data structure types.
+
+export type KpiKey =
+  | 'premium_written'
+  | 'premium_earned'
+  | 'total_loss_amount'
+  | 'claim_count'
+  | 'expense_amount'
+  | 'policy_count'
+  | 'avg_premium_per_policy'
+  | 'avg_loss_per_case'
+  | 'premium_earned_ratio'
+  | 'expense_ratio'
+  | 'loss_ratio'
+  | 'claim_frequency'
+  | 'variable_cost_ratio'
+  | 'marginal_contribution_ratio'
+  | 'marginal_contribution_amount'
+  | 'premium_share'
+  | 'avg_commercial_index';
+
+export type RawBusinessData = {
+    period_id: string;
+    period_label: string;
+    business_type: string;
+    premium_written: number;
+    premium_earned: number;
+    total_loss_amount: number;
+    expense_amount_raw: number;
+    claim_count: number;
+    avg_premium_per_policy: number;
+    avg_commercial_index: number;
+    comparison_period_id_mom: string;
+    totals_for_period: {
+        total_premium_written_overall: number;
+    };
 };
 
-export type Period = {
-  id: string;
-  name: string;
-};
+export type KpiSet = Record<KpiKey, number>;
 
-export type BusinessLine = {
-  id: string;
-  name: string;
-};
+export interface ProcessedBusinessData extends RawBusinessData {
+    kpis: KpiSet;
+}
 
-export type KpiKey = keyof Omit<BusinessLineData, 'id' | 'name'>;
+export interface DashboardData {
+    byBusinessType: ProcessedBusinessData[];
+    summary: {
+        current: ProcessedBusinessData;
+        compare: ProcessedBusinessData;
+    };
+}
 
-export const kpiDetails: Record<KpiKey, { name: string; unit: '%' | '元' | '件' | '' }> = {
-  premiumIncome: { name: '保费收入', unit: '元' },
-  payoutRate: { name: '赔付率', unit: '%' },
-  comprehensiveCostRate: { name: '综合成本率', unit: '%' },
-  newPolicies: { name: '新保业务', unit: '件' },
-  renewalRate: { name: '续保率', unit: '%' },
-  customerAcquisitionCost: { name: '获客成本', unit: '元' },
-  averageClaimCost: { name: '案均赔款', unit: '元' },
-  claimFrequency: { name: '出险频率', unit: '%' },
-};
+export interface TrendData {
+    period_id: string;
+    period_label: string;
+    kpis: KpiSet;
+}
+
+export type AnalysisMode = 'ytd' | 'pop';
+
+export interface DashboardState {
+  periods: { id: string; name: string }[];
+  businessTypes: string[];
+  currentPeriod: string;
+  comparePeriod: string;
+  analysisMode: AnalysisMode;
+  selectedBusinessTypes: string[];
+  processedData: DashboardData | null;
+  trendData: TrendData[];
+}

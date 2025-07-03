@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -16,108 +16,115 @@ import {
 } from "@/components/ui/collapsible"
 import { Button } from '@/components/ui/button';
 import { ChevronsUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { kpiDetails, type BusinessLineData, type KpiKey } from '@/lib/types';
+import { KPIS, KPI_IDS } from '@/lib/kpi-config';
+import type { DashboardData, KpiKey } from '@/lib/types';
+import { getDynamicColorByVCR } from '@/lib/colors';
+import { formatKpiValue } from '@/lib/data-utils';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface DataTableProps {
-  data: BusinessLineData[];
+  processedData: DashboardData;
 }
 
+const COLORED_KPIS: Set<KpiKey> = new Set([
+  'variable_cost_ratio', 'marginal_contribution_ratio', 'loss_ratio', 'expense_ratio'
+]);
+
 type SortConfig = {
-  key: KpiKey | 'name';
+  key: KpiKey | 'business_type';
   direction: 'ascending' | 'descending';
-} | null;
+};
 
-const headers: { key: KpiKey | 'name'; label: string }[] = [
-  { key: 'name', label: '业务线' },
-  ...Object.entries(kpiDetails).map(([key, { name }]) => ({ key: key as KpiKey, label: name }))
-];
-
-export default function DataTable({ data }: DataTableProps) {
+export default function DataTable({ processedData }: DataTableProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'premiumIncome', direction: 'descending' });
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'premium_written', direction: 'descending' });
 
-  const sortedData = [...data].sort((a, b) => {
-    if (!sortConfig) return 0;
-    const { key, direction } = sortConfig;
-    
-    const aValue = a[key as keyof BusinessLineData];
-    const bValue = b[key as keyof BusinessLineData];
+  const sortedData = useMemo(() => {
+    return [...processedData.byBusinessType].sort((a, b) => {
+      const { key, direction } = sortConfig;
+      
+      const aValue = key === 'business_type' ? a.business_type : a.kpis[key];
+      const bValue = key === 'business_type' ? b.business_type : b.kpis[key];
 
-    if (aValue < bValue) {
-      return direction === 'ascending' ? -1 : 1;
-    }
-    if (aValue > bValue) {
-      return direction === 'ascending' ? 1 : -1;
-    }
-    return 0;
-  });
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return direction === 'ascending' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+      }
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return direction === 'ascending' ? aValue - bValue : bValue - aValue;
+      }
+      return 0;
+    });
+  }, [processedData.byBusinessType, sortConfig]);
 
-  const requestSort = (key: KpiKey | 'name') => {
-    let direction: 'ascending' | 'descending' = 'ascending';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
-      direction = 'descending';
-    }
-    setSortConfig({ key, direction });
+  const requestSort = (key: KpiKey | 'business_type') => {
+    setSortConfig(current => {
+      if (current.key === key && current.direction === 'ascending') {
+        return { key, direction: 'descending' };
+      }
+      return { key, direction: 'ascending' };
+    });
   };
 
-  const getSortIcon = (key: KpiKey | 'name') => {
-    if (!sortConfig || sortConfig.key !== key) {
-        return <ChevronsUpDown className="ml-2 h-4 w-4" />;
+  const getSortIcon = (key: KpiKey | 'business_type') => {
+    if (sortConfig.key !== key) {
+        return <ChevronsUpDown className="h-4 w-4 opacity-50" />;
     }
-    if (sortConfig.direction === 'ascending') {
-        return <ArrowUp className="ml-2 h-4 w-4 text-accent" />;
-    }
-    return <ArrowDown className="ml-2 h-4 w-4 text-accent" />;
-  }
-
-  const formatCell = (item: BusinessLineData, key: KpiKey | 'name') => {
-    if (key === 'name') return item.name;
-    const value = item[key];
-    const { unit } = kpiDetails[key as KpiKey];
-    if (unit === '%') return `${value.toFixed(2)}%`;
-    if (unit === '元') return `¥${value.toLocaleString()}`;
-    return value.toLocaleString();
+    return sortConfig.direction === 'ascending' 
+        ? <ArrowUp className="h-4 w-4 text-accent" />
+        : <ArrowDown className="h-4 w-4 text-accent" />;
   }
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="flex items-center justify-between">
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="rounded-lg border bg-card text-card-foreground shadow-sm">
+      <div className="flex items-center justify-between p-4">
         <h3 className="text-lg font-semibold">详细数据表</h3>
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="sm">
-            <ChevronsUpDown className="h-4 w-4" />
+            {isOpen ? "收起" : "展开"}
+            <ChevronsUpDown className="h-4 w-4 ml-2" />
             <span className="sr-only">Toggle</span>
           </Button>
         </CollapsibleTrigger>
       </div>
       <CollapsibleContent>
-        <div className="mt-4 rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {headers.map(header => (
-                  <TableHead key={header.key}>
-                    <Button variant="ghost" onClick={() => requestSort(header.key)}>
-                      {header.label}
-                      {getSortIcon(header.key)}
-                    </Button>
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedData.map((item) => (
-                <TableRow key={item.id}>
-                  {headers.map(header => (
-                      <TableCell key={`${item.id}-${header.key}`}>
-                          {formatCell(item, header.key)}
-                      </TableCell>
-                  ))}
+        <ScrollArea className="w-full whitespace-nowrap">
+            <Table>
+                <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow>
+                    <TableHead className="sticky left-0 bg-card z-20 min-w-[150px]">
+                        <Button variant="ghost" onClick={() => requestSort('business_type')}>
+                            业务类型 {getSortIcon('business_type')}
+                        </Button>
+                    </TableHead>
+                    {KPI_IDS.map(kpiId => (
+                    <TableHead key={kpiId} className="min-w-[150px]">
+                        <Button variant="ghost" onClick={() => requestSort(kpiId)}>
+                            {KPIS[kpiId].name} {getSortIcon(kpiId)}
+                        </Button>
+                    </TableHead>
+                    ))}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                </TableHeader>
+                <TableBody>
+                {sortedData.map((item) => (
+                    <TableRow key={item.business_type}>
+                        <TableCell className="sticky left-0 bg-card font-medium z-10">{item.business_type}</TableCell>
+                        {KPI_IDS.map(kpiId => (
+                            <TableCell 
+                                key={kpiId} 
+                                className="text-right"
+                                style={{
+                                    color: COLORED_KPIS.has(kpiId) ? getDynamicColorByVCR(item.kpis.variable_cost_ratio) : 'inherit'
+                                }}
+                            >
+                                {formatKpiValue(item.kpis[kpiId], KPIS[kpiId].unit)}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+                </TableBody>
+            </Table>
+        </ScrollArea>
       </CollapsibleContent>
     </Collapsible>
   );

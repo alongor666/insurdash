@@ -1,55 +1,33 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
+import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
+import { formatKpiValue, getComparisonText } from '@/lib/data-utils';
+import type { KpiKey } from '@/lib/types';
 
 interface KpiCardProps {
+  kpiId: KpiKey;
   title: string;
   value: number;
   previousValue: number;
-  unit: '%' | '元' | '件' | '';
+  unit: '万元' | '%' | '件' | '' | '元';
 }
 
-export default function KpiCard({ title, value, previousValue, unit }: KpiCardProps) {
-  const change = previousValue !== 0 ? ((value - previousValue) / Math.abs(previousValue)) * 100 : 0;
-  const isInfiniteChange = previousValue === 0 && value !== 0;
-
-  const formatValue = (val: number) => {
-    if (unit === '%') {
-      return `${val.toFixed(2)}%`;
-    }
-    if (unit === '元') {
-      return `¥${(val / 10000).toFixed(2)}万`;
-    }
-    return val.toLocaleString();
-  };
+export default function KpiCard({ kpiId, title, value, previousValue, unit }: KpiCardProps) {
   
-  const getChangeIndicator = () => {
-    if (isInfiniteChange || Math.abs(change) < 0.01) {
-        return <Minus className="h-4 w-4 text-muted-foreground" />;
-    }
-    if (change > 0) {
-        return <ArrowUpRight className="h-4 w-4 text-accent" />;
-    }
-    return <ArrowDownRight className="h-4 w-4 text-destructive" />;
-  };
-
-  const getChangeText = () => {
-      if(isInfiniteChange) return <span className="text-muted-foreground">N/A</span>
-      if (Math.abs(change) < 0.01) return <span className="text-muted-foreground">0.00%</span>
-      return <span className={change > 0 ? "text-accent" : "text-destructive"}>{change.toFixed(2)}%</span>
-  }
+  const { icon: ChangeIcon, text: changeText, color: changeColor } = getComparisonText(kpiId, value, previousValue);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        {getChangeIndicator()}
+        <p className="text-xs text-muted-foreground">{unit}</p>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{formatValue(value)}</div>
-        <p className="text-xs text-muted-foreground flex items-center gap-1">
-          {getChangeText()} vs 对比周期
+        <div className="text-2xl font-bold">{formatKpiValue(value, unit)}</div>
+        <p className="text-xs text-muted-foreground flex items-center gap-1" style={{ color: changeColor }}>
+          <ChangeIcon className="h-4 w-4" />
+          {changeText}
         </p>
       </CardContent>
     </Card>

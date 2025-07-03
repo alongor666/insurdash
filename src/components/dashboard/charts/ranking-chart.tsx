@@ -1,63 +1,98 @@
+
 "use client"
 
 import { useState } from 'react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts"
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, LabelList, Cell } from "recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
-import { kpiDetails, type KpiKey, type BusinessLineData } from '@/lib/types';
+import { ChartContainer } from '@/components/ui/chart';
+import { KPIS } from '@/lib/kpi-config';
+import type { KpiKey, ProcessedBusinessData } from '@/lib/types';
+import { CardDescription } from '@/components/ui/card';
+import { getDynamicColorByVCR } from '@/lib/colors';
+import { formatKpiValue } from '@/lib/data-utils';
+
 
 interface RankingChartProps {
-    data: BusinessLineData[];
+    data: ProcessedBusinessData[];
 }
 
-const chartableKpis = (Object.keys(kpiDetails) as KpiKey[]);
+const chartableKpis = Object.keys(KPIS) as KpiKey[];
 
 export default function RankingChart({ data }: RankingChartProps) {
-    const [selectedKpi, setSelectedKpi] = useState<KpiKey>('premiumIncome');
-    const { unit, name } = kpiDetails[selectedKpi];
+    const [selectedKpi, setSelectedKpi] = useState<KpiKey>('premium_written');
+    const { unit, name } = KPIS[selectedKpi];
     
-    const sortedData = [...data].sort((a, b) => b[selectedKpi] - a[selectedKpi]);
-
-    const chartConfig = {
-      [selectedKpi]: {
-        label: name,
-      },
-    }
+    const sortedData = [...data].sort((a, b) => b.kpis[selectedKpi] - a.kpis[selectedKpi]);
 
     return (
         <div className="space-y-4">
-            <div className="w-full sm:w-1/4">
+            <div className="w-full sm:w-1/3">
+                <CardDescription>选择排名指标</CardDescription>
                 <Select value={selectedKpi} onValueChange={(value) => setSelectedKpi(value as KpiKey)}>
                     <SelectTrigger>
                         <SelectValue placeholder="选择指标" />
                     </SelectTrigger>
                     <SelectContent>
                     {chartableKpis.map(kpi => (
-                        <SelectItem key={kpi} value={kpi}>{kpiDetails[kpi].name}</SelectItem>
+                        <SelectItem key={kpi} value={kpi}>{KPIS[kpi].name}</SelectItem>
                     ))}
                     </SelectContent>
                 </Select>
             </div>
-            <ChartContainer config={chartConfig} className="h-[400px] w-full">
+            <div style={{ height: `${sortedData.length * 35 + 50}px`, width: '100%' }}>
                 <ResponsiveContainer>
-                    <BarChart data={sortedData} layout="vertical" margin={{ top: 0, right: 20, bottom: 0, left: 30 }}>
+                    <BarChart data={sortedData} layout="vertical" margin={{ top: 0, right: 50, bottom: 0, left: 30 }}>
                         <CartesianGrid horizontal={false} />
                         <YAxis 
-                            dataKey="name" 
+                            dataKey="business_type" 
                             type="category"
-                            width={80}
+                            width={100}
                             tickLine={false} 
                             axisLine={false}
+                            tick={{ fontSize: 12 }}
                         />
                         <XAxis type="number" hide />
                         <Tooltip
-                            cursor={{ fill: 'hsl(var(--muted))' }}
-                            content={<ChartTooltipContent />}
+                             cursor={{ fill: 'hsl(var(--muted))' }}
+                            content={({ active, payload, label }) => {
+                                if (active && payload && payload.length) {
+                                    const item = payload[0];
+                                    const kpi = KPIS[item.dataKey?.toString().replace('kpis.', '') as KpiKey];
+                                    const vcr = item.payload.kpis.variable_cost_ratio;
+                                    return (
+                                        <div className="rounded-lg border bg-background p-2 shadow-sm">
+                                            <p className="text-sm font-bold text-foreground">{label}</p>
+                                            <div className="mt-2 flex items-center justify-between">
+                                                <p className="text-xs text-muted-foreground">{kpi.name}</p>
+                                                <p className="text-xs font-medium ml-4">{formatKpiValue(item.value as number, kpi.unit)}</p>
+                                            </div>
+                                             <div className="flex items-center justify-between">
+                                                <p className="text-xs text-muted-foreground">{KPIS['variable_cost_ratio'].name}</p>
+                                                <p className="text-xs font-medium ml-4" style={{color: getDynamicColorByVCR(vcr)}}>
+                                                   {formatKpiValue(vcr, '%')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            }}
                         />
-                        <Bar dataKey={selectedKpi} name={name} fill="hsl(var(--chart-1))" radius={4} />
+                        <Bar dataKey={`kpis.${selectedKpi}`} name={name} radius={[0, 4, 4, 0]}>
+                             {sortedData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={getDynamicColorByVCR(entry.kpis.variable_cost_ratio)} />
+                            ))}
+                            <LabelList 
+                                dataKey={`kpis.${selectedKpi}`} 
+                                position="right"
+                                offset={10}
+                                className="fill-foreground"
+                                formatter={(value: number) => formatKpiValue(value, unit)}
+                            />
+                        </Bar>
                     </BarChart>
                 </ResponsiveContainer>
-            </ChartContainer>
+            </div>
         </div>
     )
 }
