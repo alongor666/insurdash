@@ -40,6 +40,7 @@ export const useDashboard = () => {
 function DashboardContent() {
   const { state, loading, isReady } = useDashboard();
 
+  // This loader is now just for data fetching, not for authentication.
   if (loading || !isReady) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -69,7 +70,7 @@ function DashboardContent() {
 }
 
 export default function DashboardPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth(); // Auth is handled by the provider, just grab the user if needed later.
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -86,13 +87,8 @@ export default function DashboardPage() {
   
   const [loading, setLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, authLoading, router]);
   
+  // This effect now only fetches initial filter options once the user is confirmed.
   useEffect(() => {
     if (user) {
       setLoading(true);
@@ -106,7 +102,7 @@ export default function DashboardPage() {
         setIsReady(true);
       });
     }
-  }, [user, searchParams]);
+  }, [user, searchParams]); // Depends on user to trigger the initial fetch.
 
   const updateURL = useCallback(() => {
     if (!isReady) return;
@@ -156,14 +152,8 @@ export default function DashboardPage() {
     setSelectedBusinessTypes: (types) => setState(s => ({ ...s, selectedBusinessTypes: types })),
   };
 
-  if (authLoading || !user) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
-  }
-
+  // The main loading UI is now handled by AuthProvider.
+  // This component will only render once auth is confirmed.
   return (
     <DashboardContext.Provider value={{ state, actions, loading, isReady }}>
       <DashboardContent />

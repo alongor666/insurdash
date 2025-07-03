@@ -1,20 +1,14 @@
 "use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import AuthForm from '@/components/auth/auth-form';
-import { BarChart3, Eye } from 'lucide-react';
+import { Eye } from 'lucide-react';
 
 export default function LoginPage() {
-  const { user, isSupabaseConfigured } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (user) {
-      router.push('/');
-    }
-  }, [user, router]);
+  const { isSupabaseConfigured } = useAuth();
+  
+  // The redirect logic is now handled globally by the AuthProvider.
+  // No need for a useEffect here anymore.
 
   return (
     <div className="min-h-screen w-full bg-background flex items-center justify-center p-4">

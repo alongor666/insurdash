@@ -4,13 +4,13 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 type AuthContextType = {
   user: User | null;
   login: (email: string, pass: string) => Promise<any>;
-  logout: () => void;
+  logout: () => Promise<void>;
   loading: boolean;
   isSupabaseConfigured: boolean;
 };
@@ -21,6 +21,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
 
   const isSupabaseConfigured = !!supabase;
 
@@ -30,43 +31,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
     }
 
+    // onAuthStateChange fires on load and on auth events.
+    // This is the single source of truth for the user's auth state.
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session: Session | null) => {
+      (event, session) => {
         setUser(session?.user ?? null);
         setLoading(false);
-        if(event === 'SIGNED_OUT') {
-            router.push('/login');
-        }
       }
     );
-
-    // Check initial session
-    const checkSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user ?? null);
-        setLoading(false);
-    }
-    checkSession();
 
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [isSupabaseConfigured, router]);
+  }, [isSupabaseConfigured]);
+
+  useEffect(() => {
+    if (loading) return; // Wait until the initial auth check is complete
+
+    // If not logged in and not already on the login page, redirect there.
+    if (!user && pathname !== '/login') {
+      router.push('/login');
+    }
+    
+    // If logged in and on the login page, redirect to the dashboard.
+    if (user && pathname === '/login') {
+      router.push('/');
+    }
+  }, [user, loading, pathname, router]);
+
 
   const value = {
     user,
     login: (email: string, pass: string) => {
-        if (!supabase) throw new Error("Supabase not configured");
+        if (!isSupabaseConfigured) throw new Error("Supabase not configured");
         return supabase.auth.signInWithPassword({ email, password: pass });
     },
     logout: async () => {
-        if (!supabase) throw new Error("Supabase not configured");
+        if (!isSupabaseConfigured) throw new Error("Supabase not configured");
+        // The listener will handle user state change and redirect.
         await supabase.auth.signOut();
-        setUser(null);
     },
     loading,
     isSupabaseConfigured
   };
+
+  // While the initial auth check is running, show a global loader.
+  // This prevents content flicker.
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
