@@ -114,9 +114,10 @@ export default function DonutChart({ data }: DonutChartProps) {
                              <Tooltip 
                                  content={({ active, payload }: any) => {
                                     if (active && payload && payload.length) {
-                                        const { name, value, payload: itemPayload } = payload[0];
-                                        const kpiKey = itemPayload.dataKey.replace('kpis.', '');
+                                        const { name, value, dataKey } = payload[0];
+                                        const kpiKey = dataKey.replace('kpis.', '');
                                         const kpi = KPIS[kpiKey as KpiKey];
+                                        if (!kpi) return null;
                                         return (
                                             <div className="rounded-lg border bg-background p-2 shadow-sm">
                                                 <div className="grid grid-cols-1 gap-2">

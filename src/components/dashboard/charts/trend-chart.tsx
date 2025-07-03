@@ -20,7 +20,10 @@ const chartableKpis = Object.keys(KPIS) as KpiKey[];
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
         const dataPoint = payload[0].payload;
-        const mainKpi = KPIS[payload[0].dataKey as KpiKey];
+        const kpiKey = payload[0].dataKey.replace('kpis.', '') as KpiKey;
+        const mainKpi = KPIS[kpiKey];
+        if (!mainKpi) return null;
+
         return (
             <div className="rounded-lg border bg-background p-2 shadow-sm">
                 <div className="grid grid-cols-1 gap-2">

@@ -17,10 +17,18 @@ interface ParetoChartProps {
 
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-        const kpi = KPIS[payload[0].dataKey as KpiKey];
-        const paretoValue = payload[0].value;
-        const cumulativeValue = payload[1].value;
-        const vcr = payload[0].payload.kpis.variable_cost_ratio;
+        const barPayload = payload.find(p => p.dataKey.startsWith('kpis.'));
+        const linePayload = payload.find(p => p.dataKey === 'cumulativePercentage');
+
+        if (!barPayload || !linePayload) return null;
+        
+        const kpiKey = barPayload.dataKey.replace('kpis.', '') as KpiKey;
+        const kpi = KPIS[kpiKey];
+        if (!kpi) return null;
+
+        const paretoValue = barPayload.value;
+        const cumulativeValue = linePayload.value;
+        const vcr = barPayload.payload.kpis.variable_cost_ratio;
 
         return (
             <div className="rounded-lg border bg-background p-2 shadow-sm">
