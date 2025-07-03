@@ -1,13 +1,16 @@
 "use client";
 
+import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDashboard } from '@/hooks/use-dashboard';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface GlobalFiltersProps {
@@ -25,13 +28,44 @@ export default function GlobalFilters({ periods, businessTypes }: GlobalFiltersP
   } = state;
 
   const { setPeriod, setComparePeriod, setAnalysisMode, setSelectedBusinessTypes } = actions;
+  
+  const [isOpen, setIsOpen] = useState(false);
+  const [tempSelection, setTempSelection] = useState<string[]>(selectedBusinessTypes);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const handleSelectAll = () => setSelectedBusinessTypes(businessTypes);
-  const handleDeselectAll = () => setSelectedBusinessTypes([]);
+  useEffect(() => {
+    if (isOpen) {
+      setTempSelection(selectedBusinessTypes);
+      setSearchQuery("");
+    }
+  }, [isOpen, selectedBusinessTypes]);
+
+  const filteredBusinessTypes = useMemo(() => 
+    businessTypes.filter(bt => bt.toLowerCase().includes(searchQuery.toLowerCase())),
+    [businessTypes, searchQuery]
+  );
+
+  const handleSelectAll = () => setTempSelection(businessTypes);
+  const handleDeselectAll = () => setTempSelection([]);
   const handleInvertSelection = () => {
-    const newSelection = businessTypes.filter(bt => !selectedBusinessTypes.includes(bt));
-    setSelectedBusinessTypes(newSelection);
-  }
+    const currentSelectionInFiltered = new Set(tempSelection.filter(t => filteredBusinessTypes.includes(t)));
+    const newSelection = [
+        // Keep selections that were not part of the filtered list
+        ...tempSelection.filter(t => !filteredBusinessTypes.includes(t)),
+        // Invert selection for the currently visible items
+        ...filteredBusinessTypes.filter(bt => !currentSelectionInFiltered.has(bt))
+    ];
+    setTempSelection(newSelection);
+  };
+  
+  const handleConfirm = () => {
+    setSelectedBusinessTypes(tempSelection);
+    setIsOpen(false);
+  };
+
+  const handleCancel = () => {
+    setIsOpen(false);
+  };
 
   return (
     <div className="sticky top-[65px] z-30 bg-background/95 backdrop-blur-sm p-4 -mx-4 -mt-4 mb-4 border-b">
@@ -60,7 +94,7 @@ export default function GlobalFilters({ periods, businessTypes }: GlobalFiltersP
         </div>
         <div className="space-y-1">
             <Label>业务类型</Label>
-             <Popover>
+             <Popover open={isOpen} onOpenChange={setIsOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" className="w-full justify-between" disabled={businessTypes.length === 0}>
                   <span className="truncate">
@@ -71,40 +105,45 @@ export default function GlobalFilters({ periods, businessTypes }: GlobalFiltersP
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                <Command>
-                  <CommandInput placeholder="搜索业务线..." />
-                  <div className="p-2 border-b flex justify-between">
-                      <Button variant="link" size="sm" className="h-auto p-0" onClick={handleSelectAll}>全选</Button>
-                      <Button variant="link" size="sm" className="h-auto p-0" onClick={handleInvertSelection}>反选</Button>
-                      <Button variant="link" size="sm" className="h-auto p-0" onClick={handleDeselectAll}>清空</Button>
-                  </div>
-                  <CommandList>
-                    <CommandEmpty>未找到业务线。</CommandEmpty>
-                    <CommandGroup>
-                      {businessTypes.map((line) => (
-                        <CommandItem
-                          key={line}
-                          onSelect={() => {
-                            setSelectedBusinessTypes(current => 
-                              current.includes(line)
-                                ? current.filter(id => id !== line)
-                                : [...current, line]
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <div className="p-2 border-b">
+                  <Input 
+                    placeholder="搜索业务线..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="p-2 border-b flex justify-between">
+                    <Button variant="link" size="sm" className="h-auto p-0" onClick={handleSelectAll}>全选</Button>
+                    <Button variant="link" size="sm" className="h-auto p-0" onClick={handleInvertSelection}>反选</Button>
+                    <Button variant="link" size="sm" className="h-auto p-0" onClick={handleDeselectAll}>清空</Button>
+                </div>
+                <ScrollArea className="h-64">
+                    <div className="p-2 space-y-1">
+                    {filteredBusinessTypes.length > 0 ? filteredBusinessTypes.map((line) => (
+                        <div key={line} className="flex items-center space-x-2 p-1 rounded-md hover:bg-muted">
+                        <Checkbox
+                            id={`temp-${line}`}
+                            checked={tempSelection.includes(line)}
+                            onCheckedChange={(checked) => {
+                            setTempSelection(current => 
+                                checked
+                                ? [...current, line]
+                                : current.filter(id => id !== line)
                             );
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              selectedBusinessTypes.includes(line) ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {line}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
+                            }}
+                        />
+                        <Label htmlFor={`temp-${line}`} className="text-sm font-normal flex-1 cursor-pointer">
+                            {line}
+                        </Label>
+                        </div>
+                    )) : <p className="text-sm text-center text-muted-foreground p-4">无匹配结果</p>}
+                    </div>
+                </ScrollArea>
+                 <div className="p-2 border-t flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={handleCancel}>取消</Button>
+                    <Button size="sm" onClick={handleConfirm}>确认</Button>
+                </div>
               </PopoverContent>
             </Popover>
         </div>

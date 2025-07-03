@@ -122,7 +122,7 @@ export default function DashboardPage() {
   
   const actions = {
     setPeriod: (periodId: string) => setState(s => ({ ...s, currentPeriod: periodId })),
-    setComparePeriod: (periodId) => setState(s => ({ ...s, comparePeriod: periodId })),
+    setComparePeriod: (periodId: string) => setState(s => ({ ...s, comparePeriod: periodId })),
     setAnalysisMode: (mode: AnalysisMode) => setState(s => ({ ...s, analysisMode: mode })),
     setSelectedBusinessTypes: (types: string[]) => setState(s => ({ ...s, selectedBusinessTypes: types })),
   };
