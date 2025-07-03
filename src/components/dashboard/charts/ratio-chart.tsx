@@ -18,61 +18,49 @@ interface DonutChartProps {
 }
 
 const LegendTable = ({ data, innerMetric, outerMetric }: { data: any[], innerMetric: KpiKey | 'none', outerMetric: KpiKey | 'none' }) => {
-    const totalInner = innerMetric !== 'none' ? data.reduce((sum, item) => sum + item.kpis[innerMetric], 0) : 0;
-    const totalOuter = outerMetric !== 'none' ? data.reduce((sum, item) => sum + item.kpis[outerMetric], 0) : 0;
-    
-    // Data is now pre-sorted
+    const totalInner = innerMetric !== 'none' ? data.reduce((sum, item) => sum + (item.kpis[innerMetric] || 0), 0) : 0;
+    const totalOuter = outerMetric !== 'none' ? data.reduce((sum, item) => sum + (item.kpis[outerMetric] || 0), 0) : 0;
+
     const sortedData = data;
-
-    const half = Math.ceil(sortedData.length / 2);
-    const firstHalf = sortedData.slice(0, half);
-    const secondHalf = sortedData.slice(half);
-
-    const renderTable = (dataset: any[]) => (
-        <Table className="text-xs">
-            <TableHeader>
-                <TableRow>
-                    <TableHead className="h-8">业务线</TableHead>
-                    {outerMetric !== 'none' && <TableHead className="text-right h-8">外环占比</TableHead>}
-                    {innerMetric !== 'none' && <TableHead className="text-right h-8">内环占比</TableHead>}
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {dataset.map(item => {
-                    const outerValue = outerMetric !== 'none' ? item.kpis[outerMetric] : 0;
-                    const innerValue = innerMetric !== 'none' ? item.kpis[innerMetric] : 0;
-                    const outerRatio = totalOuter > 0 ? (outerValue / totalOuter) * 100 : 0;
-                    const innerRatio = totalInner > 0 ? (innerValue / totalInner) * 100 : 0;
-
-                    return (
-                        <TableRow key={item.business_type} className="h-8">
-                            <TableCell className="py-1 flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full" style={{backgroundColor: item.color}}></div>
-                                {item.business_type}
-                            </TableCell>
-                            {outerMetric !== 'none' && 
-                                <TableCell className="py-1 text-right font-medium" style={{color: getDynamicColorForDonutLegend(outerRatio, innerRatio, 'outer')}}>
-                                    {formatKpiValue(outerRatio, '%')}
-                                </TableCell>
-                            }
-                             {innerMetric !== 'none' && 
-                                <TableCell className="py-1 text-right font-medium" style={{color: getDynamicColorForDonutLegend(outerRatio, innerRatio, 'inner')}}>
-                                    {formatKpiValue(innerRatio, '%')}
-                                </TableCell>
-                            }
-                        </TableRow>
-                    );
-                })}
-            </TableBody>
-        </Table>
-    );
 
     return (
         <ScrollArea className="h-full">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
-                <div>{renderTable(firstHalf)}</div>
-                <div>{renderTable(secondHalf)}</div>
-            </div>
+            <Table className="text-xs">
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className="h-8">业务线</TableHead>
+                        {outerMetric !== 'none' && <TableHead className="text-right h-8">外环占比</TableHead>}
+                        {innerMetric !== 'none' && <TableHead className="text-right h-8">内环占比</TableHead>}
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {sortedData.map(item => {
+                        const outerValue = outerMetric !== 'none' ? item.kpis[outerMetric] : 0;
+                        const innerValue = innerMetric !== 'none' ? item.kpis[innerMetric] : 0;
+                        const outerRatio = totalOuter > 0 ? (outerValue / totalOuter) * 100 : 0;
+                        const innerRatio = totalInner > 0 ? (innerValue / totalInner) * 100 : 0;
+
+                        return (
+                            <TableRow key={item.business_type} className="h-8">
+                                <TableCell className="py-1 flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full" style={{backgroundColor: item.color}}></div>
+                                    <span className="truncate">{item.business_type}</span>
+                                </TableCell>
+                                {outerMetric !== 'none' && 
+                                    <TableCell className="py-1 text-right font-medium" style={{color: getDynamicColorForDonutLegend(outerRatio, innerRatio, 'outer')}}>
+                                        {formatKpiValue(outerRatio, '%')}
+                                    </TableCell>
+                                }
+                                 {innerMetric !== 'none' && 
+                                    <TableCell className="py-1 text-right font-medium" style={{color: getDynamicColorForDonutLegend(outerRatio, innerRatio, 'inner')}}>
+                                        {formatKpiValue(innerRatio, '%')}
+                                    </TableCell>
+                                }
+                            </TableRow>
+                        );
+                    })}
+                </TableBody>
+            </Table>
         </ScrollArea>
     );
 };

@@ -1,43 +1,66 @@
 # .github/workflows/deploy.yml
+
+# 剧本名称
 name: Deploy to Cloudflare Pages
 
+# 触发条件：当有任何代码被推送到 main 分支时
 on:
   push:
     branches:
       - main
 
+# 任务定义
 jobs:
+  # 定义一个名为 "publish" 的发布任务
   publish:
+    # 指定任务运行在最新版的 Ubuntu 虚拟机上
     runs-on: ubuntu-latest
+    # 授予任务读写权限，以便与 Cloudflare Pages 交互
     permissions:
       contents: read
       deployments: write
 
+    # 任务步骤
     steps:
+      # 第1步：检出代码
+      # 将您的 GitHub 仓库代码下载到虚拟机中
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 第2步：设置 Node.js 环境
+      # 安装我们项目所需的 Node.js 版本
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
+      # 第3步：安装项目依赖
+      # 使用 npm ci 命令，它比 npm install 更快、更适合自动化环境
       - name: Install Dependencies
         run: npm ci
 
+      # 第4步：构建项目
+      # 这是核心步骤，机器人将在这里打包您的应用
       - name: Build Project
         run: npm run build
         env:
+          # 关键：从 GitHub Secrets 中安全地注入生产环境变量
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
+      # 第5步：发布到 Cloudflare Pages
+      # 使用 Cloudflare 官方提供的 action 工具进行部署
       - name: Publish to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v3
         with:
+          # 必填：从 Secrets 读取您的 Cloudflare API 令牌
           apiToken: ${{ secrets.CF_API_TOKEN }}
+          # 必填：从 Secrets 读取您的 Cloudflare 账户 ID
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          projectName: ${{ secrets.CF_PROJECT_NAME }}
-          directory: out
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          branch: main
+          # 必填：您在 Cloudflare 上创建的 Pages 项目名称
+          projectName: 'insurdash'
+          # 必填：构建产物的目录。对于 Next.js 静态导出，目录是 'out'
+          directory: 'out'
+          # 可选：明确指定这是对生产分支的部署
+          branch: 'main'
