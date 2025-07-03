@@ -53,13 +53,30 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function TrendChart({ data }: TrendChartProps) {
     const [selectedKpi, setSelectedKpi] = useState<KpiKey>('premium_written');
     const { unit, name, type } = KPIS[selectedKpi];
-    const ChartComponent = type === 'ratio' || type === 'average' ? LineChart : BarChart;
 
     const chartConfig = {
       [selectedKpi]: {
         label: name,
       },
     }
+    
+    const chartProps = {
+        data: data, 
+        margin: { top: 20, right: 20, bottom: 20, left: 20 }
+    };
+    
+    const commonChartElements = (
+        <>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="period_label" tickLine={false} tickMargin={10} axisLine={false} tick={{fontSize: 12}} />
+            <YAxis tickFormatter={(value) => formatKpiValue(value, unit, true)} />
+            <Tooltip
+                cursor={{fill: 'hsl(var(--muted))'}}
+                content={<CustomTooltip />}
+            />
+            <Legend />
+        </>
+    );
 
     return (
         <div className="space-y-4">
@@ -78,19 +95,9 @@ export default function TrendChart({ data }: TrendChartProps) {
             </div>
             <ChartContainer config={chartConfig} className="h-[400px] w-full">
                 <ResponsiveContainer>
-                    <ChartComponent 
-                        data={data} 
-                        margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-                    >
-                        <CartesianGrid vertical={false} />
-                        <XAxis dataKey="period_label" tickLine={false} tickMargin={10} axisLine={false} tick={{fontSize: 12}} />
-                        <YAxis tickFormatter={(value) => formatKpiValue(value, unit, true)} />
-                        <Tooltip
-                            cursor={{fill: 'hsl(var(--muted))'}}
-                            content={<CustomTooltip />}
-                        />
-                        <Legend />
-                        {type === 'ratio' || type === 'average' ? (
+                    {type === 'ratio' || type === 'average' ? (
+                         <LineChart {...chartProps}>
+                            {commonChartElements}
                             <Line 
                                 type="monotone"
                                 dataKey={`kpis.${selectedKpi}`}
@@ -99,7 +106,10 @@ export default function TrendChart({ data }: TrendChartProps) {
                                 strokeWidth={2}
                                 dot={{ r: 4 }}
                             />
-                        ) : (
+                        </LineChart>
+                    ) : (
+                         <BarChart {...chartProps}>
+                            {commonChartElements}
                             <Bar 
                                 dataKey={`kpis.${selectedKpi}`}
                                 name={name}
@@ -109,8 +119,8 @@ export default function TrendChart({ data }: TrendChartProps) {
                                     <Cell key={`cell-${index}`} fill={getDynamicColorByVCR(entry.kpis.variable_cost_ratio)} />
                                 ))}
                             </Bar>
-                        )}
-                    </ChartComponent>
+                        </BarChart>
+                    )}
                 </ResponsiveContainer>
             </ChartContainer>
         </div>

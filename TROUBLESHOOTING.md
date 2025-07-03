@@ -46,38 +46,44 @@ payload.find((p: any) => p.dataKey === 'someKey'); // 明确告诉 TypeScript 'p
 **现象**:
 在 `npm run build` 或 GitHub Actions 部署过程中，构建失败并抛出 TypeScript 错误，提示某个 JSX 元素的类型没有构造或调用签名。
 
-```
-Type error: JSX element type 'ChartElement' does not have any construct or call signatures.
-
-  92 |                         />
-  93 |                         <Legend />
-> 94 |                         <ChartElement
-     |                          ^
-```
-
 **根本原因分析**:
-此错误源于一种在 TypeScript 中不够安全的编码模式：**将组件有条件地赋值给一个变量，然后尝试渲染该变量**。
+此错误源于一种在 TypeScript 中不够安全的编码模式：**将 React 组件有条件地赋值给一个变量，然后尝试将该变量作为 JSX 标签进行渲染**。
 
-```typescript
-// 导致错误的设计模式
-const ChartElement = condition ? Line : Bar;
-// ...
-return <ChartElement />;
-```
-
-尽管 `Line` 和 `Bar` 都是有效的 React 组件，但 TypeScript 无法保证 `ChartElement` 变量在所有情况下都具有可被 JSX 调用的有效组件签名。这种动态赋值的方式对类型推断系统来说过于模糊。
+尽管被赋值的都是有效的 React 组件（例如 Recharts 的 `LineChart` 和 `BarChart`），但 TypeScript 的静态分析无法在所有情况下都保证该变量在渲染时一定是一个合法的、可被 JSX 调用的组件类型。这种动态赋值的方式对类型推断系统来说过于模糊，从而导致编译失败。
 
 **解决方案与最佳实践**:
-解决方案是使用**显式的 JSX 条件渲染**，而不是将组件赋值给变量。这种方式类型安全，也是 React 的标准实践。
+解决方案是始终使用**显式的 JSX 条件渲染**，这是 React 官方推荐的、类型安全的核心模式。避免将组件本身赋值给变量，而是直接在 JSX 中使用三元运算符 (`? :`) 或逻辑与 (`&&`) 来控制渲染哪个组件。
 
+**错误示例**:
 ```typescript
-// 正确的设计模式
+// 错误的设计模式：将组件赋值给变量
+const ChartComponent = condition ? LineChart : BarChart;
+const ChartElement = condition ? Line : Bar;
+
+return (
+  <ChartComponent>
+    <ChartElement />
+  </ChartComponent>
+);
+```
+
+**正确示例**:
+```typescript
+// 正确的设计模式：直接在 JSX 中进行条件渲染
 return (
   <>
-    {condition ? <Line /> : <Bar />}
+    {condition ? (
+      <LineChart>
+        <Line />
+      </LineChart>
+    ) : (
+      <BarChart>
+        <Bar />
+      </BarChart>
+    )}
   </>
 )
 ```
 
 **排查技巧**:
-当遇到此错误时，请检查代码中是否存在将组件（特别是来自第三方库的组件）赋值给变量后再进行渲染的地方。将其重构为使用三元运算符（`? :`）或逻辑与（`&&`）直接在 JSX 中进行条件渲染。
+当遇到此错误时，请全局搜索代码，检查是否存在将组件（特别是来自第三方库的组件，首字母大写的变量）赋值给变量后再进行渲染的地方。将其重构为使用三元运算符（`? :`）或逻辑与（`&&`）直接在 JSX 中进行条件渲染。
