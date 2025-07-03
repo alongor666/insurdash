@@ -35,7 +35,7 @@ export default function KpiCard({ kpiId, title, value, previousValue, unit }: Kp
     if (unit === '%') {
         changeText = `${diff > 0 ? '+' : ''}${diff.toFixed(1)} p.p. (${percentageChange > 0 ? '+' : ''}${percentageChange.toFixed(1)}%)`;
     } else {
-        changeText = `${formatKpiValue(diff, unit)} (${percentageChange > 0 ? '+' : ''}${percentageChange.toFixed(1)}%)`;
+        changeText = `${diff > 0 ? '+' : ''}${formatKpiValue(diff, unit)} (${percentageChange > 0 ? '+' : ''}${percentageChange.toFixed(1)}%)`;
     }
   }
 
