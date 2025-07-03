@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 import { useAuth } from '@/hooks/use-auth';
-import { DashboardContext } from '@/hooks/use-dashboard';
+import { DashboardContext, useDashboard } from '@/hooks/use-dashboard';
 import Header from '@/components/dashboard/header';
 import GlobalFilters from '@/components/dashboard/global-filters';
 import KpiCardGrid from '@/components/dashboard/kpi-card-grid';
