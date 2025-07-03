@@ -370,17 +370,20 @@ graph TD
    * 创建 Supabase 项目，设计 business_data 表，并填充样本数据。  
    * 进入 Project Settings \> API，复制并妥善保管 **Project URL** 和 anon **public key**。  
    * **(重要)** 前往 Authentication \> Policies，为您的 business_data 表**开启并配置行级安全策略 (Row Level Security, RLS)**。一个简单的初始策略是：“只允许已登录的用户 (authenticated users) 读取 business_data 表”。这是保障数据安全的核心！  
-2. **Cloudflare 设置**:  
-   * 登录 Cloudflare，获取您的 **Account ID**。  
-   * 在 我的个人资料 \> API 令牌 页面，创建一个具有“编辑 Cloudflare Workers”权限的 **API Token** 并复制。  
-   * 在 Workers & Pages 中，创建一个新的 Pages 项目，连接到您的 GitHub 仓库，但在设置中**关闭“自动部署”**。记下这个项目的**项目名称 (Project name)**。  
-3. **GitHub 设置**:  
-   * 创建一个新的 GitHub 仓库，例如 insurdash。  
-   * 进入 Settings \> Security \> Secrets and variables \> Actions，配置以下**四个 Repository secrets**：  
-     * CF\_API\_TOKEN: 您的 Cloudflare API 令牌。  
-     * CF\_ACCOUNT\_ID: 您的 Cloudflare 账户 ID。  
-     * SUPABASE\_URL: 您的**生产** Supabase 项目 URL。  
-     * SUPABASE\_ANON\_KEY: 您的**生产** Supabase anon 公钥。
+2. **Cloudflare 设置 (关键步骤)**:  
+   * 登录 Cloudflare。在主页右侧，找到并复制您的 **Account ID**。
+   * 前往 **Workers & Pages**。创建一个新的 Pages 项目，连接到您的 GitHub 仓库，但在构建和部署设置中，选择“无”或“稍后配置”，以**关闭“自动部署”**。
+   * **(重要)** 项目创建后，进入该项目的页面，复制页面上显示的**项目名称 (Project name)**。**请确保这个名称与您在 GitHub Secrets 中设置的 `CF_PROJECT_NAME` 完全一致。**
+   * 在 **我的个人资料 > API 令牌** 页面，创建一个新的 API Token。使用 `Edit Cloudflare Workers` 模板即可。复制生成的令牌。
+
+3. **GitHub 设置 (关键步骤)**:  
+   * 创建一个新的 GitHub 仓库。
+   * 进入 **Settings > Security > Secrets and variables > Actions**，配置以下**五个 Repository secrets**。请仔细核对，确保没有拼写错误或多余的空格。
+     * `CF_ACCOUNT_ID`: 您从 Cloudflare 主页复制的 **Account ID**。
+     * `CF_PROJECT_NAME`: 您在 Cloudflare Pages 中创建的项目的**确切名称**。
+     * `CF_API_TOKEN`: 您生成的 Cloudflare API 令牌。
+     * `SUPABASE_URL`: 您的**生产** Supabase 项目 URL。  
+     * `SUPABASE_ANON_KEY`: 您的**生产** Supabase anon 公钥。
 
 ### **5.2. 阶段二：配置自动化部署 (GitHub Actions)**
 
@@ -426,7 +429,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          projectName: insurdash
+          projectName: ${{ secrets.CF_PROJECT_NAME }}
           directory: out
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
           branch: main
@@ -458,4 +461,3 @@ jobs:
 
 注1: 在聚合多个业务线时，avg\_premium\_per\_policy 会被重新加权平均计算，而不是直接求和。  
 注2: avg\_commercial\_index 仅在未聚合（即只选择单个业务线）且分析模式为“累计”时可用，否则显示为0。
-
