@@ -1,20 +1,22 @@
 import { KPIS, KPI_IDS } from "./kpi-config";
 import { getComparisonMetrics, formatKpiValue } from "./data";
-import type { DashboardData, DashboardState } from "./types";
+import type { DashboardData, DashboardState, TrendData } from "./types";
 
 export function generateAiAnalysisText(
     chart: string,
     state: Omit<DashboardState, 'processedData' | 'trendData'>,
     processedData: DashboardData,
+    trendData: TrendData[]
 ): string {
 
-    const { currentPeriod, comparePeriod, analysisMode, selectedBusinessTypes, periods } = state;
+    const { currentPeriod, comparePeriod, analysisMode, selectedBusinessTypes, periods, businessTypes } = state;
     const currentPeriodLabel = periods.find(p => p.id === currentPeriod)?.name || currentPeriod;
     const comparePeriodLabel = periods.find(p => p.id === comparePeriod)?.name || comparePeriod;
 
     let kpiTable = `| 指标 | 当前周期 | 对比周期 | 变化 |\n`;
     kpiTable += `|:---|---:|---:|---:|\n`;
     for(const kpiId of KPI_IDS) {
+        if (!KPIS[kpiId]) continue;
         const kpi = KPIS[kpiId];
         const currentVal = processedData.summary.current.kpis[kpiId];
         const compareVal = processedData.summary.compare.kpis[kpiId];
@@ -27,20 +29,47 @@ export function generateAiAnalysisText(
             changeText = "新增";
         } else {
              if (unit === '%') {
-                changeText = `${diff > 0 ? '+' : ''}${diff.toFixed(1)} p.p. (${percentageChange > 0 ? '+' : ''}${percentageChange.toFixed(1)}%)`;
+                changeText = `${diff > 0 ? '+' : ''}${formatKpiValue(diff, unit)} p.p. (${percentageChange > 0 ? '+' : ''}${formatKpiValue(percentageChange, '%')})`;
             } else {
-                changeText = `${formatKpiValue(diff, unit)} (${percentageChange > 0 ? '+' : ''}${percentageChange.toFixed(1)}%)`;
+                changeText = `${diff > 0 ? '+' : ''}${formatKpiValue(diff, unit)} (${percentageChange > 0 ? '+' : ''}${formatKpiValue(percentageChange, '%')})`;
             }
         }
         
-        kpiTable += `| ${kpi.name} | ${formatKpiValue(currentVal, kpi.unit)} | ${formatKpiValue(compareVal, kpi.unit)} | ${changeText.replace(/\s+/g, '')} |\n`;
+        kpiTable += `| ${kpi.name} | ${formatKpiValue(currentVal, kpi.unit)} | ${formatKpiValue(compareVal, kpi.unit)} | ${changeText} |\n`;
     }
 
-    let chartData = `| 业务线 | ${KPI_IDS.map(id => KPIS[id].name).join(' | ')} |\n`;
-    chartData += `|:---|${KPI_IDS.map(() => '---:').join('')}|\n`;
-    processedData.byBusinessType.forEach(line => {
-        chartData += `| ${line.business_type} | ${KPI_IDS.map(id => formatKpiValue(line.kpis[id], KPIS[id].unit)).join(' | ')} |\n`;
-    });
+    let chartDataTable: string;
+    let chartDescription: string = "";
+
+    const chartTitles: Record<string, string> = {
+        trend: "趋势分析",
+        donut: "占比分析",
+        ranking: "业务排名",
+        bubble: "多维气泡",
+        pareto: "帕累托"
+    };
+    
+    const chartTitle = chartTitles[chart] || chart;
+
+    if (chart === 'trend' && trendData) {
+        chartDescription = `这是 "${chartTitle}" 图表所使用的历史数据明细:`;
+        const trendKpiHeaders = KPI_IDS.map(id => KPIS[id].name).join(' | ');
+        chartDataTable = `| 周期 | ${trendKpiHeaders} |\n`;
+        chartDataTable += `|:---|${KPI_IDS.map(() => '---:').join('')}|\n`;
+        trendData.forEach(period => {
+            const row = `| ${period.period_label} | ${KPI_IDS.map(id => formatKpiValue(period.kpis[id], KPIS[id].unit)).join(' | ')} |\n`;
+            chartDataTable += row;
+        });
+    } else {
+        chartDescription = `这是 "${chartTitle}" 图表所使用的数据明细:`;
+        const businessTypeKpiHeaders = KPI_IDS.map(id => KPIS[id].name).join(' | ');
+        chartDataTable = `| 业务线 | ${businessTypeKpiHeaders} |\n`;
+        chartDataTable += `|:---|${KPI_IDS.map(() => '---:').join('')}|\n`;
+        processedData.byBusinessType.forEach(line => {
+            const row = `| ${line.business_type} | ${KPI_IDS.map(id => formatKpiValue(line.kpis[id], KPIS[id].unit)).join(' | ')} |\n`;
+            chartDataTable += row;
+        });
+    }
 
 
     return `
@@ -53,7 +82,7 @@ export function generateAiAnalysisText(
 - **当前周期**: ${currentPeriodLabel}
 - **对比周期**: ${comparePeriodLabel}
 - **分析模式**: ${analysisMode === 'ytd' ? '累计 (YTD)' : '当周 (PoP)'}
-- **分析范围**: ${selectedBusinessTypes.length === state.businessTypes.length ? '全部业务' : selectedBusinessTypes.join(', ')}
+- **分析范围**: ${selectedBusinessTypes.length === businessTypes.length ? '全部业务' : selectedBusinessTypes.join(', ')}
 
 ## 2. 核心指标看板 (KPIs)
 
@@ -63,9 +92,9 @@ ${kpiTable}
 
 ## 3. 当前图表详细数据
 
-这是 "${chart}" 图表所使用的数据明细：
+${chartDescription}
 
-${chartData}
+${chartDataTable}
 
 ## 4. AI 分析指令
 

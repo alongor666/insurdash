@@ -33,7 +33,7 @@ export default function ChartsSection({ processedData, trendData }: ChartsSectio
     setIsModalOpen(true);
   };
   
-  const aiContent = generateAiAnalysisText(activeTab, state, processedData);
+  const aiContent = generateAiAnalysisText(activeTab, state, processedData, trendData);
 
   const ChartWrapper = ({ title, description, children }: { title: string, description: string, children: React.ReactNode }) => (
     <Card>
