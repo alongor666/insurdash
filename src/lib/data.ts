@@ -1,3 +1,4 @@
+
 import { supabase } from './supabase/client';
 import type { RawBusinessData, DashboardData, KpiKey, ProcessedBusinessData, TrendData } from './types';
 import { KPIS } from "./kpi-config";
@@ -22,14 +23,14 @@ export async function getFilterOptions(): Promise<{ periods: { id: string, name:
     const periodMap = new Map<string, string>();
     const businessTypeSet = new Set<string>();
 
-    data.forEach(item => {
+    for (const item of data) {
         if (item.period_id && item.period_label) {
             periodMap.set(item.period_id, item.period_label);
         }
         if (item.business_type) {
             businessTypeSet.add(item.business_type);
         }
-    });
+    }
 
     const periods = Array.from(periodMap.entries())
         .map(([id, name]) => ({ id, name }))
@@ -76,6 +77,8 @@ export async function getRawDataForTrend(
     if(startIndex === -1) return [];
 
     const trendPeriodIds = sortedPeriodIds.slice(startIndex, startIndex + count + 1);
+
+    if (trendPeriodIds.length === 0) return [];
 
     const { data: trendData, error: trendError } = await supabase
         .from('business_data')
@@ -265,7 +268,7 @@ export function processDashboardData(
 
     const compareDataForProcessing = analysisMode === 'ytd' 
         ? compareFiltered
-        : calculatePeriodOverPeriod(compareFiltered, []); // No previous for compare in PoP
+        : [];
 
     const totalPremiumCurrent = currentPeriodRawData.reduce((sum, item) => sum + (item.premium_written || 0), 0);
     const totalPremiumCompare = comparePeriodRawData.reduce((sum, item) => sum + (item.premium_written || 0), 0);
@@ -273,7 +276,6 @@ export function processDashboardData(
     const byBusinessType = currentDataForProcessing.map(businessLineData => {
         const kpis = calculateKpis(businessLineData);
         kpis.premium_share = safeDivide(kpis.premium_written, totalPremiumCurrent) * 100;
-        // Only show avg_commercial_index for single business type selection in YTD mode
         if (selectedBusinessTypes.length !== 1 || analysisMode === 'pop') {
             kpis.avg_commercial_index = 0;
         }
@@ -310,7 +312,7 @@ export function processTrendData(
     selectedBusinessTypes: string[],
     analysisMode: 'ytd' | 'pop'
 ): TrendData[] {
-    if (!trendRaw) return [];
+    if (!trendRaw || trendRaw.length === 0) return [];
     
     return trendRaw.map(periodData => {
         const processedPeriod = processDashboardData(periodData.current, periodData.previous, selectedBusinessTypes, analysisMode);
@@ -319,7 +321,7 @@ export function processTrendData(
             period_label: periodData.period_label,
             kpis: processedPeriod.summary.current.kpis
         };
-    });
+    }).filter(p => p.kpis.policy_count > 0); // Filter out empty/bad data points
 }
 // #endregion
 
@@ -328,24 +330,31 @@ export function formatKpiValue(value: number, unit: '万元' | '%' | '件' | '' 
     if (value === null || value === undefined || isNaN(value)) {
         return 'N/A';
     }
+
     switch(unit) {
         case '万元':
+        case '元':
+        case '件': {
+            const roundedValue = Math.round(value);
             if (short) {
-                if (Math.abs(value) >= 10000) return `${(value / 10000).toFixed(0)}亿`;
-                if (Math.abs(value) >= 1) return `${value.toFixed(0)}万`;
+                if (unit === '元' && Math.abs(roundedValue) >= 10000) {
+                    return `${(roundedValue / 10000).toLocaleString(undefined, {maximumFractionDigits: 1})}万`;
+                }
+                if (unit === '万元' && Math.abs(roundedValue) >= 10000) {
+                    return `${(roundedValue / 10000).toLocaleString(undefined, {maximumFractionDigits: 1})}亿`;
+                }
             }
-            return value.toFixed(2);
+            return roundedValue.toLocaleString();
+        }
+
         case '%':
             return `${value.toFixed(1)}%`;
-        case '元':
-             if (short) {
-                if (Math.abs(value) >= 10000) return `${(value / 10000).toFixed(1)}万`;
-             }
-            return value.toFixed(0);
-        case '件':
-            return value.toLocaleString();
+
+        case '': // For avg_commercial_index, which is a coefficient
+            return value.toFixed(4); // Keep precision
+
         default:
-            return value.toFixed(2);
+            return value.toLocaleString();
     }
 }
 
