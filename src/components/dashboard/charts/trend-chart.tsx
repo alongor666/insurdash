@@ -54,7 +54,6 @@ export default function TrendChart({ data }: TrendChartProps) {
     const [selectedKpi, setSelectedKpi] = useState<KpiKey>('premium_written');
     const { unit, name, type } = KPIS[selectedKpi];
     const ChartComponent = type === 'ratio' || type === 'average' ? LineChart : BarChart;
-    const ChartElement = type === 'ratio' || type === 'average' ? Line : Bar;
 
     const chartConfig = {
       [selectedKpi]: {
@@ -91,18 +90,26 @@ export default function TrendChart({ data }: TrendChartProps) {
                             content={<CustomTooltip />}
                         />
                         <Legend />
-                        <ChartElement 
-                            dataKey={`kpis.${selectedKpi}`}
-                            name={name}
-                            stroke="hsl(var(--chart-1))"
-                            radius={unit === '%' ? 0 : [4,4,0,0]}
-                        >
-                        {
-                            (ChartElement === Bar) && data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={getDynamicColorByVCR(entry.kpis.variable_cost_ratio)} />
-                            ))
-                        }
-                        </ChartElement>
+                        {type === 'ratio' || type === 'average' ? (
+                            <Line 
+                                type="monotone"
+                                dataKey={`kpis.${selectedKpi}`}
+                                name={name}
+                                stroke="hsl(var(--chart-1))"
+                                strokeWidth={2}
+                                dot={{ r: 4 }}
+                            />
+                        ) : (
+                            <Bar 
+                                dataKey={`kpis.${selectedKpi}`}
+                                name={name}
+                                radius={[4, 4, 0, 0]}
+                            >
+                                {data.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={getDynamicColorByVCR(entry.kpis.variable_cost_ratio)} />
+                                ))}
+                            </Bar>
+                        )}
                     </ChartComponent>
                 </ResponsiveContainer>
             </ChartContainer>

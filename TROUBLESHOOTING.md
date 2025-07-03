@@ -41,3 +41,43 @@ payload.find((p: any) => p.dataKey === 'someKey'); // 明确告诉 TypeScript 'p
 
 **排查技巧**:
 当遇到此错误时，请仔细检查错误信息中提到的文件和行号。找到对应的回调函数（如 `(item) => ...`），并为其参数添加类型，例如 `(item: YourType) => ...` 或 `(item: any) => ...`。
+## 3. 自动化部署失败: `JSX element type 'ChartElement' does not have any construct or call signatures`
+
+**现象**:
+在 `npm run build` 或 GitHub Actions 部署过程中，构建失败并抛出 TypeScript 错误，提示某个 JSX 元素的类型没有构造或调用签名。
+
+```
+Type error: JSX element type 'ChartElement' does not have any construct or call signatures.
+
+  92 |                         />
+  93 |                         <Legend />
+> 94 |                         <ChartElement
+     |                          ^
+```
+
+**根本原因分析**:
+此错误源于一种在 TypeScript 中不够安全的编码模式：**将组件有条件地赋值给一个变量，然后尝试渲染该变量**。
+
+```typescript
+// 导致错误的设计模式
+const ChartElement = condition ? Line : Bar;
+// ...
+return <ChartElement />;
+```
+
+尽管 `Line` 和 `Bar` 都是有效的 React 组件，但 TypeScript 无法保证 `ChartElement` 变量在所有情况下都具有可被 JSX 调用的有效组件签名。这种动态赋值的方式对类型推断系统来说过于模糊。
+
+**解决方案与最佳实践**:
+解决方案是使用**显式的 JSX 条件渲染**，而不是将组件赋值给变量。这种方式类型安全，也是 React 的标准实践。
+
+```typescript
+// 正确的设计模式
+return (
+  <>
+    {condition ? <Line /> : <Bar />}
+  </>
+)
+```
+
+**排查技巧**:
+当遇到此错误时，请检查代码中是否存在将组件（特别是来自第三方库的组件）赋值给变量后再进行渲染的地方。将其重构为使用三元运算符（`? :`）或逻辑与（`&&`）直接在 JSX 中进行条件渲染。
