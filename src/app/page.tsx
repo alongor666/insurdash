@@ -12,7 +12,7 @@ import ChartsSection from '@/components/dashboard/charts-section';
 import DataTable from '@/components/dashboard/data-table';
 import { Loader2 } from 'lucide-react';
 
-import { getPeriods, getBusinessLines, getDashboardData } from '@/lib/data';
+import { getFilterOptions, getDashboardData } from '@/lib/data';
 import type { Period, BusinessLine, BusinessLineData } from '@/lib/types';
 
 export default function DashboardPage() {
@@ -43,10 +43,7 @@ export default function DashboardPage() {
       setUser(session.user);
       
       try {
-        const [fetchedPeriods, fetchedBusinessLines] = await Promise.all([
-          getPeriods(),
-          getBusinessLines()
-        ]);
+        const { periods: fetchedPeriods, businessLines: fetchedBusinessLines } = await getFilterOptions();
 
         setPeriods(fetchedPeriods);
         setBusinessLines(fetchedBusinessLines);

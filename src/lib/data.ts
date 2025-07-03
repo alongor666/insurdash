@@ -1,39 +1,28 @@
 import { supabase } from './supabase/client';
 import type { BusinessLineData, Period, BusinessLine } from './types';
 
-export async function getPeriods(): Promise<Period[]> {
-    if (!supabase) return [];
+export async function getFilterOptions(): Promise<{ periods: Period[], businessLines: BusinessLine[] }> {
+    if (!supabase) return { periods: [], businessLines: [] };
     
     const { data, error } = await supabase
         .from('business_data')
-        .select('period_id, period_name')
+        .select('period_id, period_name, business_line_id, business_line_name')
         .order('period_id', { ascending: false });
 
     if (error) {
-        console.error('Error fetching periods:', error);
+        console.error('Error fetching filter options:', error);
         throw error;
     }
 
-    const uniquePeriods = Array.from(new Map(data.map(item => [item.period_id, {id: item.period_id, name: item.period_name}])).values());
+    const uniquePeriods = Array.from(new Map(data.map(item => 
+        [item.period_id, {id: item.period_id, name: item.period_name}]
+    )).values());
     
-    return uniquePeriods;
-}
-
-export async function getBusinessLines(): Promise<BusinessLine[]> {
-    if (!supabase) return [];
+    const uniqueBusinessLines = Array.from(new Map(data.map(item => 
+        [item.business_line_id, {id: item.business_line_id, name: item.business_line_name}]
+    )).values());
     
-    const { data, error } = await supabase
-        .from('business_data')
-        .select('business_line_id, business_line_name');
-    
-    if (error) {
-        console.error('Error fetching business lines:', error);
-        throw error;
-    }
-    
-    const uniqueBusinessLines = Array.from(new Map(data.map(item => [item.business_line_id, {id: item.business_line_id, name: item.business_line_name}])).values());
-
-    return uniqueBusinessLines;
+    return { periods: uniquePeriods, businessLines: uniqueBusinessLines };
 }
 
 export async function getDashboardData(periodId: string): Promise<BusinessLineData[]> {
