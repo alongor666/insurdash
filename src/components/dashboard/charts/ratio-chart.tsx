@@ -1,13 +1,10 @@
 
 "use client"
 
-import { useState, useMemo } from 'react'
-import { Pie, PieChart, ResponsiveContainer, Cell, Legend, Tooltip } from "recharts"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChartContainer } from '@/components/ui/chart';
-import { KPIS, DONUT_PARETO_KPI_IDS } from '@/lib/kpi-config';
+import { useMemo } from 'react'
+import { Pie, PieChart, ResponsiveContainer, Cell, Tooltip } from "recharts"
+import { KPIS } from '@/lib/kpi-config';
 import type { KpiKey, ProcessedBusinessData } from '@/lib/types';
-import { CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatKpiValue } from '@/lib/data';
@@ -15,6 +12,8 @@ import { getDynamicColorForDonutLegend, getDynamicColorByVCR } from '@/lib/color
 
 interface DonutChartProps {
     data: ProcessedBusinessData[];
+    outerMetric: KpiKey | 'none';
+    innerMetric: KpiKey | 'none';
 }
 
 const LegendTable = ({ data, innerMetric, outerMetric }: { data: any[], innerMetric: KpiKey | 'none', outerMetric: KpiKey | 'none' }) => {
@@ -66,10 +65,7 @@ const LegendTable = ({ data, innerMetric, outerMetric }: { data: any[], innerMet
 };
 
 
-export default function DonutChart({ data }: DonutChartProps) {
-    const [outerMetric, setOuterMetric] = useState<KpiKey | 'none'>('premium_written');
-    const [innerMetric, setInnerMetric] = useState<KpiKey | 'none'>('total_loss_amount');
-    
+export default function DonutChart({ data, outerMetric, innerMetric }: DonutChartProps) {
     const chartData = useMemo(() => {
         const sortedData = [...data].sort((a, b) => {
             if (outerMetric !== 'none') return b.kpis[outerMetric] - a.kpis[outerMetric];
@@ -86,15 +82,13 @@ export default function DonutChart({ data }: DonutChartProps) {
     if (innerMetric === 'none' && outerMetric === 'none') {
         return (
             <div className="flex flex-col h-full">
-                <FilterControls innerMetric={innerMetric} setInnerMetric={setInnerMetric} outerMetric={outerMetric} setOuterMetric={setOuterMetric} />
-                <div className="flex-grow flex items-center justify-center text-muted-foreground">请至少选择一个指标</div>
+                <div className="flex-grow flex items-center justify-center text-muted-foreground h-[300px]">请至少选择一个指标</div>
             </div>
         )
     }
 
     return (
         <div className="flex flex-col h-full">
-             <FilterControls innerMetric={innerMetric} setInnerMetric={setInnerMetric} outerMetric={outerMetric} setOuterMetric={setOuterMetric} />
             <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-4 items-center">
                 <div className="w-full h-[300px]">
                     <ResponsiveContainer>
@@ -167,32 +161,3 @@ export default function DonutChart({ data }: DonutChartProps) {
         </div>
     )
 }
-
-const FilterControls = ({innerMetric, setInnerMetric, outerMetric, setOuterMetric}: any) => (
-    <div className="flex flex-col sm:flex-row gap-4 mb-4">
-        <div className="flex-1 space-y-1">
-            <CardDescription>外环指标</CardDescription>
-            <Select value={outerMetric} onValueChange={(val) => setOuterMetric(val as KpiKey | 'none')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                <SelectItem value="none">无</SelectItem>
-                {DONUT_PARETO_KPI_IDS.map(kpi => (
-                    <SelectItem key={kpi} value={kpi}>{KPIS[kpi].name}</SelectItem>
-                ))}
-                </SelectContent>
-            </Select>
-        </div>
-        <div className="flex-1 space-y-1">
-            <CardDescription>内环指标</CardDescription>
-            <Select value={innerMetric} onValueChange={(val) => setInnerMetric(val as KpiKey | 'none')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                <SelectItem value="none">无</SelectItem>
-                {DONUT_PARETO_KPI_IDS.map(kpi => (
-                    <SelectItem key={kpi} value={kpi}>{KPIS[kpi].name}</SelectItem>
-                ))}
-                </SelectContent>
-            </Select>
-        </div>
-    </div>
-)
