@@ -2,10 +2,71 @@
 import { supabase } from './supabase/client';
 import type { RawBusinessData, DashboardData, KpiKey, ProcessedBusinessData, TrendData } from './types';
 import { KPIS } from "./kpi-config";
+import sampleData from './sample-data.json';
 
 // #region Data Fetching
+
+// --- Fallback data functions for when Supabase is not configured ---
+
+function getLocalFilterOptions(): { periods: { id: string; name: string }[]; businessTypes: string[] } {
+    const periodMap = new Map<string, string>();
+    const businessTypeSet = new Set<string>();
+
+    for (const item of sampleData) {
+        if (item.period_id && item.period_label) {
+            periodMap.set(item.period_id, item.period_label);
+        }
+        if (item.business_type) {
+            businessTypeSet.add(item.business_type);
+        }
+    }
+
+    const periods = Array.from(periodMap.entries())
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => b.id.localeCompare(a.id));
+    
+    const businessTypes = Array.from(businessTypeSet).sort();
+    
+    return { periods, businessTypes };
+}
+
+function getLocalRawDataForPeriod(periodId: string): RawBusinessData[] {
+    return sampleData.filter(item => item.period_id === periodId) as RawBusinessData[];
+}
+
+function getLocalRawDataForTrend(endPeriodId: string, count: number) {
+    const { periods } = getLocalFilterOptions();
+    const sortedPeriodIds = periods.map(p => p.id);
+    const startIndex = sortedPeriodIds.indexOf(endPeriodId);
+    if(startIndex === -1) return [];
+
+    const result = [];
+    for(let i = 0; i < count; i++) {
+        const currentPeriodId = sortedPeriodIds[startIndex + i];
+        const previousPeriodId = sortedPeriodIds[startIndex + i + 1];
+
+        if(!currentPeriodId || !previousPeriodId) break;
+
+        const current = getLocalRawDataForPeriod(currentPeriodId);
+        const previous = getLocalRawDataForPeriod(previousPeriodId);
+        
+        if (current.length > 0) {
+             result.push({
+                period_id: currentPeriodId,
+                period_label: current[0].period_label,
+                current,
+                previous
+             })
+        }
+    }
+    
+    return result.reverse();
+}
+
+// --- Main data functions ---
+
 export async function getFilterOptions(): Promise<{ periods: { id: string, name: string }[], businessTypes: string[] }> {
-    if (!supabase) return { periods: [], businessTypes: [] };
+    if (!supabase) return getLocalFilterOptions();
     
     const { data, error } = await supabase
         .from('business_data')
@@ -13,11 +74,11 @@ export async function getFilterOptions(): Promise<{ periods: { id: string, name:
 
     if (error) {
         console.error('Error fetching filter options:', error);
-        throw error;
+        return getLocalFilterOptions();
     }
 
-    if (!data) {
-        return { periods: [], businessTypes: [] };
+    if (!data || data.length === 0) {
+        return getLocalFilterOptions();
     }
 
     const periodMap = new Map<string, string>();
@@ -42,7 +103,7 @@ export async function getFilterOptions(): Promise<{ periods: { id: string, name:
 }
 
 export async function getRawDataForPeriod(periodId: string): Promise<RawBusinessData[]> {
-    if (!supabase || !periodId) return [];
+    if (!supabase || !periodId) return getLocalRawDataForPeriod(periodId);
     
     const { data, error } = await supabase
         .from('business_data')
@@ -51,30 +112,30 @@ export async function getRawDataForPeriod(periodId: string): Promise<RawBusiness
         
     if (error) {
         console.error(`Error fetching data for period ${periodId}:`, error);
-        throw error;
+        return getLocalRawDataForPeriod(periodId);
     }
     
-    return data as RawBusinessData[];
+    return (data as RawBusinessData[]) || [];
 }
 
 export async function getRawDataForTrend(
     endPeriodId: string,
     count: number
 ): Promise<{ period_id: string, period_label: string, current: RawBusinessData[], previous: RawBusinessData[] }[]> {
-    if (!supabase || !endPeriodId) return [];
+    if (!supabase || !endPeriodId) return getLocalRawDataForTrend(endPeriodId, count);
 
     const { data: allPeriods, error: allPeriodsError } = await supabase
         .from('business_data')
         .select('period_id')
         .order('period_id', { ascending: false });
 
-    if(allPeriodsError || !allPeriods) {
-        console.error("Error fetching all period IDs for trend", allPeriodsError);
-        return [];
+    if(allPeriodsError || !allPeriods || allPeriods.length === 0) {
+        console.error("Error fetching all period IDs for trend, falling back to local.", allPeriodsError);
+        return getLocalRawDataForTrend(endPeriodId, count);
     }
     const sortedPeriodIds = [...new Set(allPeriods.map(p => p.period_id))];
     const startIndex = sortedPeriodIds.indexOf(endPeriodId);
-    if(startIndex === -1) return [];
+    if(startIndex === -1) return getLocalRawDataForTrend(endPeriodId, count);
 
     const trendPeriodIds = sortedPeriodIds.slice(startIndex, startIndex + count + 1);
 
@@ -86,8 +147,8 @@ export async function getRawDataForTrend(
         .in('period_id', trendPeriodIds);
 
     if (trendError || !trendData) {
-        console.error('Error fetching trend data:', trendError);
-        return [];
+        console.error('Error fetching trend data, falling back to local.', trendError);
+        return getLocalRawDataForTrend(endPeriodId, count);
     }
     
     const dataByPeriod = trendData.reduce((acc, row) => {
