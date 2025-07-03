@@ -10,7 +10,7 @@ import type { KpiKey, ProcessedBusinessData } from '@/lib/types';
 import { CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { formatKpiValue } from '@/lib/data-utils';
+import { formatKpiValue } from '@/lib/data';
 import { getDynamicColorForDonutLegend } from '@/lib/colors';
 
 interface DonutChartProps {

@@ -8,7 +8,7 @@ import { ChartContainer } from '@/components/ui/chart';
 import { KPIS } from '@/lib/kpi-config';
 import type { KpiKey, ProcessedBusinessData } from '@/lib/types';
 import { getDynamicColorByVCR } from '@/lib/colors';
-import { formatKpiValue } from '@/lib/data-utils';
+import { formatKpiValue } from '@/lib/data';
 import { CardDescription } from '@/components/ui/card';
 
 interface BubbleChartProps {

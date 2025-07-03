@@ -19,7 +19,7 @@ import { ChevronsUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { KPIS, KPI_IDS } from '@/lib/kpi-config';
 import type { DashboardData, KpiKey } from '@/lib/types';
 import { getDynamicColorByVCR } from '@/lib/colors';
-import { formatKpiValue } from '@/lib/data-utils';
+import { formatKpiValue } from '@/lib/data';
 import { ScrollArea } from '../ui/scroll-area';
 
 interface DataTableProps {

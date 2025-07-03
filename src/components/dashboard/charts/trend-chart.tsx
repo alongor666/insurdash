@@ -8,7 +8,7 @@ import { ChartContainer } from '@/components/ui/chart';
 import { KPIS } from '@/lib/kpi-config';
 import type { KpiKey, TrendData } from '@/lib/types';
 import { CardDescription } from '@/components/ui/card';
-import { formatKpiValue } from '@/lib/data-utils';
+import { formatKpiValue } from '@/lib/data';
 import { getDynamicColorByVCR } from '@/lib/colors';
 
 interface TrendChartProps {

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
 import AiAnalysisModal from "./ai-analysis-modal";
 import { generateAiAnalysisText } from "@/lib/ai-text-generator";
-import { useDashboardState } from "@/hooks/use-dashboard-state";
+import { useDashboard } from "@/app/page";
 
 interface ChartsSectionProps {
     processedData: DashboardData;
@@ -23,7 +23,7 @@ interface ChartsSectionProps {
 type ChartTab = "trend" | "donut" | "ranking" | "bubble" | "pareto";
 
 export default function ChartsSection({ processedData, trendData }: ChartsSectionProps) {
-  const { state } = useDashboardState();
+  const { state } = useDashboard();
   const [activeTab, setActiveTab] = useState<ChartTab>("trend");
   const [isModalOpen, setIsModalOpen] = useState(false);
   

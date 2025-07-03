@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { useDashboardState } from '@/hooks/use-dashboard-state';
+import { useDashboard } from '@/app/page';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,13 +16,15 @@ interface GlobalFiltersProps {
 }
 
 export default function GlobalFilters({ periods, businessTypes }: GlobalFiltersProps) {
-  const { state, setPeriod, setComparePeriod, setAnalysisMode, setSelectedBusinessTypes } = useDashboardState();
+  const { state, actions } = useDashboard();
   const {
     currentPeriod,
     comparePeriod,
     analysisMode,
     selectedBusinessTypes,
   } = state;
+
+  const { setPeriod, setComparePeriod, setAnalysisMode, setSelectedBusinessTypes } = actions;
 
   const handleSelectAll = () => setSelectedBusinessTypes(businessTypes);
   const handleDeselectAll = () => setSelectedBusinessTypes([]);

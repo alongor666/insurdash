@@ -1,5 +1,5 @@
 import { KPIS, KPI_IDS } from "./kpi-config";
-import { getComparisonText, formatKpiValue } from "./data-utils";
+import { getComparisonMetrics, formatKpiValue } from "./data";
 import type { DashboardData, DashboardState } from "./types";
 
 export function generateAiAnalysisText(
@@ -18,7 +18,21 @@ export function generateAiAnalysisText(
         const kpi = KPIS[kpiId];
         const currentVal = processedData.summary.current.kpis[kpiId];
         const compareVal = processedData.summary.compare.kpis[kpiId];
-        const { text: changeText } = getComparisonText(kpiId, currentVal, compareVal);
+        
+        const { diff, percentageChange, isZero, isNew, unit } = getComparisonMetrics(kpiId, currentVal, compareVal);
+        let changeText;
+        if (isZero) {
+            changeText = "无变化";
+        } else if (isNew) {
+            changeText = "新增";
+        } else {
+             if (unit === '%') {
+                changeText = `${diff > 0 ? '+' : ''}${diff.toFixed(1)} p.p. (${percentageChange > 0 ? '+' : ''}${percentageChange.toFixed(1)}%)`;
+            } else {
+                changeText = `${formatKpiValue(diff, unit)} (${percentageChange > 0 ? '+' : ''}${percentageChange.toFixed(1)}%)`;
+            }
+        }
+        
         kpiTable += `| ${kpi.name} | ${formatKpiValue(currentVal, kpi.unit)} | ${formatKpiValue(compareVal, kpi.unit)} | ${changeText.replace(/\s+/g, '')} |\n`;
     }
 

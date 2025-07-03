@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
-import { formatKpiValue, getComparisonText } from '@/lib/data-utils';
+import { formatKpiValue, getComparisonMetrics } from '@/lib/data';
 import type { KpiKey } from '@/lib/types';
 
 interface KpiCardProps {
@@ -15,7 +15,30 @@ interface KpiCardProps {
 
 export default function KpiCard({ kpiId, title, value, previousValue, unit }: KpiCardProps) {
   
-  const { icon: ChangeIcon, text: changeText, color: changeColor } = getComparisonText(kpiId, value, previousValue);
+  const { diff, percentageChange, isBetter, isZero, isNew } = getComparisonMetrics(kpiId, value, previousValue);
+
+  let ChangeIcon;
+  let changeText;
+  let changeColor;
+
+  if (isZero) {
+    ChangeIcon = Minus;
+    changeText = "无变化";
+    changeColor = "hsl(var(--muted-foreground))";
+  } else if (isNew) {
+    ChangeIcon = ArrowUp;
+    changeText = "新增";
+    changeColor = "hsl(var(--accent))";
+  } else {
+    ChangeIcon = isBetter ? ArrowUp : ArrowDown;
+    changeColor = isBetter ? 'hsl(140, 80%, 40%)' : 'hsl(0, 80%, 50%)';
+    if (unit === '%') {
+        changeText = `${diff > 0 ? '+' : ''}${diff.toFixed(1)} p.p. (${percentageChange > 0 ? '+' : ''}${percentageChange.toFixed(1)}%)`;
+    } else {
+        changeText = `${formatKpiValue(diff, unit)} (${percentageChange > 0 ? '+' : ''}${percentageChange.toFixed(1)}%)`;
+    }
+  }
+
 
   return (
     <Card>

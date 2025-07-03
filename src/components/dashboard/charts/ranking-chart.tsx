@@ -9,7 +9,7 @@ import { KPIS } from '@/lib/kpi-config';
 import type { KpiKey, ProcessedBusinessData } from '@/lib/types';
 import { CardDescription } from '@/components/ui/card';
 import { getDynamicColorByVCR } from '@/lib/colors';
-import { formatKpiValue } from '@/lib/data-utils';
+import { formatKpiValue } from '@/lib/data';
 
 
 interface RankingChartProps {

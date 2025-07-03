@@ -1,6 +1,5 @@
-import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import { KPIS } from "./kpi-config";
-import type { DashboardData, KpiKey, ProcessedBusinessData, RawBusinessData } from "./types";
+import type { DashboardData, KpiKey, ProcessedBusinessData, RawBusinessData, TrendData } from "./types";
 
 // Safely divide, returning 0 if denominator is 0
 function safeDivide(numerator: number, denominator: number): number {
@@ -197,6 +196,24 @@ export function processDashboardData(
 }
 
 
+export function processTrendData(
+    trendRaw: { period_id: string, period_label: string, current: RawBusinessData[], previous: RawBusinessData[] }[],
+    selectedBusinessTypes: string[],
+    analysisMode: 'ytd' | 'pop'
+): TrendData[] {
+    if (!trendRaw) return [];
+    
+    return trendRaw.map(periodData => {
+        const processedPeriod = processDashboardData(periodData.current, periodData.previous, selectedBusinessTypes, analysisMode);
+        return {
+            period_id: periodData.period_id,
+            period_label: periodData.period_label,
+            kpis: processedPeriod.summary.current.kpis
+        };
+    });
+}
+
+
 export function formatKpiValue(value: number, unit: '万元' | '%' | '件' | '' | '元', short = false): string {
     if (value === null || value === undefined || isNaN(value)) {
         return 'N/A';
@@ -223,39 +240,19 @@ export function formatKpiValue(value: number, unit: '万元' | '%' | '件' | '' 
 }
 
 
-export function getComparisonText(kpiId: KpiKey, currentValue: number, previousValue: number) {
+export function getComparisonMetrics(kpiId: KpiKey, currentValue: number, previousValue: number) {
     const { positiveChangeIs, unit } = KPIS[kpiId];
     
-    if (previousValue === 0 && currentValue === 0) {
-        return { icon: Minus, text: "无变化", color: "hsl(var(--muted-foreground))" };
-    }
+    const isNew = previousValue === 0 && currentValue !== 0 && previousValue !== currentValue;
     if (previousValue === 0) {
-        return { icon: ArrowUp, text: "新增", color: "hsl(var(--accent))" };
+        return { diff: currentValue, percentageChange: Infinity, isBetter: positiveChangeIs === 'up', isZero: currentValue === 0, isNew, unit };
     }
 
     const diff = currentValue - previousValue;
     const percentageChange = safeDivide(diff, Math.abs(previousValue)) * 100;
 
-    let text;
-    if (unit === '%') {
-        text = `${diff.toFixed(1)} p.p. (${percentageChange.toFixed(1)}%)`;
-    } else {
-        text = `${formatKpiValue(diff, unit)} (${percentageChange.toFixed(1)}%)`;
-    }
-    
     const isPositive = diff > 0;
-    let icon, color;
-
-    if (Math.abs(diff) < 1e-6) {
-        icon = Minus;
-        color = 'hsl(var(--muted-foreground))';
-    } else if ((isPositive && positiveChangeIs === 'up') || (!isPositive && positiveChangeIs === 'down')) {
-        icon = ArrowUp;
-        color = 'hsl(140, 80%, 40%)'; // Green
-    } else {
-        icon = ArrowDown;
-        color = 'hsl(0, 80%, 50%)'; // Red
-    }
+    const isBetter = (isPositive && positiveChangeIs === 'up') || (!isPositive && positiveChangeIs === 'down');
     
-    return { icon, text, color };
+    return { diff, percentageChange, isBetter, isZero: Math.abs(diff) < 1e-6, isNew: false, unit };
 }
