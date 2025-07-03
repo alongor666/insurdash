@@ -30,7 +30,7 @@ export default function KpiCard({ kpiId, title, value, previousValue, unit }: Kp
     changeText = "新增";
     changeColor = "hsl(var(--accent))";
   } else {
-    ChangeIcon = isBetter ? ArrowUp : ArrowDown;
+    ChangeIcon = diff > 0 ? ArrowUp : ArrowDown;
     changeColor = isBetter ? 'hsl(140, 80%, 40%)' : 'hsl(0, 80%, 50%)';
     if (unit === '%') {
         changeText = `${diff > 0 ? '+' : ''}${diff.toFixed(1)} p.p. (${percentageChange > 0 ? '+' : ''}${percentageChange.toFixed(1)}%)`;
