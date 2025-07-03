@@ -375,21 +375,7 @@ graph TD
      * SUPABASE\_URL: 您的**生产** Supabase 项目 URL。  
      * SUPABASE\_ANON\_KEY: 您的**生产** Supabase anon 公钥。
 
-### **5.2. 阶段二：云端开发与版本控制 (Project IDX)**
-
-1. **创建 IDX 工作区**: 从您的 insurdash GitHub 仓库导入，并选择 Next.js 环境模板。  
-2. **配置开发环境**:  
-   * 在 IDX 工作区根目录创建 .env.local 文件。  
-   * 在其中填入**开发用的** Supabase 凭证：  
-     NEXT\_PUBLIC\_SUPABASE\_URL=https://\<你的开发实例ID\>.supabase.co  
-     NEXT\_PUBLIC\_SUPABASE\_ANON\_KEY=\<你的开发实例anon\_key\>
-
-3. **开发与预览**:  
-   * 使用 IDX 内置终端运行 npm run dev。  
-   * 在右侧的 Web Preview 面板中查看应用的实时效果。  
-   * 完成开发后，使用 IDX 内置的 Git 工具提交并推送到 GitHub。
-
-### **5.3. 关键阶段：配置自动化部署 (GitHub Actions)**
+### **5.2. 阶段二：配置自动化部署 (GitHub Actions)**
 
 在您的项目根目录 .github/workflows/ 下，创建 deploy.yml 文件，并粘贴以下内容：
 
@@ -436,7 +422,7 @@ jobs:
           directory: 'out' \# 对于 Next.js 静态导出，目录是 'out'  
           branch: 'main'
 
-**注意**: 由于我们使用了 output: 'export'，Next.js 的静态构建产物目录是 out，这里已经为您修正。
+
 
 ## **6\. 附录：核心指标字典 (指标血缘地图)**
 

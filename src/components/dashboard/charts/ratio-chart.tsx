@@ -11,7 +11,7 @@ import { CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatKpiValue } from '@/lib/data';
-import { getDynamicColorForDonutLegend } from '@/lib/colors';
+import { getDynamicColorForDonutLegend, getDynamicColorByVCR } from '@/lib/colors';
 
 interface DonutChartProps {
     data: ProcessedBusinessData[];
@@ -86,14 +86,11 @@ export default function DonutChart({ data }: DonutChartProps) {
     const [innerMetric, setInnerMetric] = useState<KpiKey | 'none'>('total_loss_amount');
     
     const chartData = useMemo(() => {
-        return data.map((d, i) => ({
+        return data.map(d => ({
             ...d,
-            color: `hsl(var(--chart-${(i % 5) + 1}))`
+            color: getDynamicColorByVCR(d.kpis.variable_cost_ratio)
         }))
     }, [data])
-
-    const outerData = outerMetric !== 'none' ? chartData.map(d => ({name: d.business_type, value: d.kpis[outerMetric], color: d.color})) : []
-    const innerData = innerMetric !== 'none' ? chartData.map(d => ({name: d.business_type, value: d.kpis[innerMetric], color: d.color})) : []
 
     if (innerMetric === 'none' && outerMetric === 'none') {
         return (
@@ -114,10 +111,13 @@ export default function DonutChart({ data }: DonutChartProps) {
                              <Tooltip 
                                  content={({ active, payload }: any) => {
                                     if (active && payload && payload.length) {
-                                        const { name, value, dataKey } = payload[0];
-                                        const kpiKey = dataKey.replace('kpis.', '');
+                                        const { name, value } = payload[0];
+                                        // Since dataKey is dynamic, find the correct kpi
+                                        const kpiKey = Object.keys(payload[0].payload.kpis).find(k => payload[0].payload.kpis[k] === value);
                                         const kpi = KPIS[kpiKey as KpiKey];
+                                        
                                         if (!kpi) return null;
+                                        
                                         return (
                                             <div className="rounded-lg border bg-background p-2 shadow-sm">
                                                 <div className="grid grid-cols-1 gap-2">
