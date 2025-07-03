@@ -422,11 +422,14 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
       - name: Publish to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/pages-action@v1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy out --project-name=insurdash --branch=main
+          projectName: insurdash
+          directory: out
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          branch: main
 ```
 
 ## **6\. 附录：核心指标字典 (指标血缘地图)**
@@ -455,3 +458,4 @@ jobs:
 
 注1: 在聚合多个业务线时，avg\_premium\_per\_policy 会被重新加权平均计算，而不是直接求和。  
 注2: avg\_commercial\_index 仅在未聚合（即只选择单个业务线）且分析模式为“累计”时可用，否则显示为0。
+
