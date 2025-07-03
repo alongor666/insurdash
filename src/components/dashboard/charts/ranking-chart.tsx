@@ -54,7 +54,7 @@ export default function RankingChart({ data }: RankingChartProps) {
                         <XAxis type="number" hide />
                         <Tooltip
                              cursor={{ fill: 'hsl(var(--muted))' }}
-                            content={({ active, payload, label }) => {
+                            content={({ active, payload, label }: any) => {
                                 if (active && payload && payload.length) {
                                     const item = payload[0];
                                     const kpi = KPIS[item.dataKey?.toString().replace('kpis.', '') as KpiKey];

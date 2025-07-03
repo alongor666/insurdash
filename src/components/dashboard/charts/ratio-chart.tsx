@@ -111,10 +111,9 @@ export default function DonutChart({ data }: DonutChartProps) {
                              <Tooltip 
                                  content={({ active, payload }: any) => {
                                     if (active && payload && payload.length) {
-                                        const { name, value } = payload[0];
-                                        // Since dataKey is dynamic, find the correct kpi
-                                        const kpiKey = Object.keys(payload[0].payload.kpis).find(k => payload[0].payload.kpis[k] === value);
-                                        const kpi = KPIS[kpiKey as KpiKey];
+                                        const { name, value, dataKey } = payload[0];
+                                        const kpiKey = (dataKey as string).replace('kpis.', '') as KpiKey;
+                                        const kpi = KPIS[kpiKey];
                                         
                                         if (!kpi) return null;
                                         
