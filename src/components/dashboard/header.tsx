@@ -23,6 +23,7 @@ export default function Header({ user }: HeaderProps) {
   const router = useRouter();
 
   const handleLogout = async () => {
+    if (!supabase) return;
     await supabase.auth.signOut();
     router.push('/login');
   };
@@ -43,7 +44,7 @@ export default function Header({ user }: HeaderProps) {
       <div className="ml-auto">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
+            <Button variant="ghost" size="icon" className="rounded-full" disabled={!user}>
               <Avatar>
                 <AvatarImage src={`https://placehold.co/32x32.png`} />
                 <AvatarFallback>{getInitials(user?.email)}</AvatarFallback>
@@ -53,7 +54,11 @@ export default function Header({ user }: HeaderProps) {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>{user?.email || 'My Account'}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
+            <DropdownMenuItem 
+              onClick={handleLogout} 
+              disabled={!supabase || !user}
+              className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+            >
               <LogOut className="mr-2 h-4 w-4" />
               <span>登出</span>
             </DropdownMenuItem>

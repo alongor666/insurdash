@@ -24,6 +24,7 @@ export default function AuthForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const isSupabaseConfigured = !!supabase;
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -34,6 +35,14 @@ export default function AuthForm() {
   });
 
   const handleLogin = async (values: LoginFormValues) => {
+    if (!isSupabaseConfigured) {
+      toast({
+        title: '配置错误',
+        description: 'Supabase未配置，无法登录。请检查环境变量。',
+        variant: 'destructive',
+      });
+      return;
+    }
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({
       email: values.email,
@@ -61,7 +70,11 @@ export default function AuthForm() {
     <Card>
       <CardHeader>
         <CardTitle>欢迎回来</CardTitle>
-        <CardDescription>请输入您的凭据以访问仪表盘。</CardDescription>
+        <CardDescription>
+          {isSupabaseConfigured
+            ? '请输入您的凭据以访问仪表盘。'
+            : 'Supabase未配置，登录功能已禁用。'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-6">
@@ -72,7 +85,7 @@ export default function AuthForm() {
               type="email"
               placeholder="you@example.com"
               {...form.register('email')}
-              disabled={loading}
+              disabled={loading || !isSupabaseConfigured}
             />
             {form.formState.errors.email && (
               <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
@@ -85,13 +98,13 @@ export default function AuthForm() {
               type="password"
               placeholder="••••••••"
               {...form.register('password')}
-              disabled={loading}
+              disabled={loading || !isSupabaseConfigured}
             />
             {form.formState.errors.password && (
               <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
             )}
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || !isSupabaseConfigured}>
             {loading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (

@@ -10,6 +10,12 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
+    if (!supabase) {
+      // Supabase is not configured, so we can't check for an active session.
+      // The auth form will be disabled automatically.
+      return;
+    }
+
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {

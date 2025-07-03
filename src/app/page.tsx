@@ -28,6 +28,12 @@ export default function DashboardPage() {
   const selectedBusinessLines = searchParams.get('bl')?.split(',') || MOCK_BUSINESS_LINES.map(bl => bl.id);
 
   useEffect(() => {
+    // If supabase is not configured, run in offline mode
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -46,7 +52,7 @@ export default function DashboardPage() {
     });
 
     return () => {
-      authListener.subscription.unsubscribe();
+      authListener?.subscription.unsubscribe();
     };
   }, [router]);
 
