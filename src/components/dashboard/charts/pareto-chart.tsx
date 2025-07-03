@@ -17,8 +17,8 @@ interface ParetoChartProps {
 
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-        const barPayload = payload.find(p => p.dataKey.startsWith('kpis.'));
-        const linePayload = payload.find(p => p.dataKey === 'cumulativePercentage');
+        const barPayload = payload.find((p: any) => p.dataKey.startsWith('kpis.'));
+        const linePayload = payload.find((p: any) => p.dataKey === 'cumulativePercentage');
 
         if (!barPayload || !linePayload) return null;
         
