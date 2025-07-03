@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
 import AiAnalysisModal from "./ai-analysis-modal";
 import { generateAiAnalysisText } from "@/lib/ai-text-generator";
-import { useDashboard } from "@/app/page";
+import { useDashboard } from "@/hooks/use-dashboard";
 
 interface ChartsSectionProps {
     processedData: DashboardData;

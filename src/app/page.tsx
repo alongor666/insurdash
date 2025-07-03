@@ -1,46 +1,22 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 import { useAuth } from '@/hooks/use-auth';
+import { DashboardContext } from '@/hooks/use-dashboard';
 import Header from '@/components/dashboard/header';
 import GlobalFilters from '@/components/dashboard/global-filters';
 import KpiCardGrid from '@/components/dashboard/kpi-card-grid';
 import ChartsSection from '@/components/dashboard/charts-section';
 import DataTable from '@/components/dashboard/data-table';
 import { getFilterOptions, getRawDataForPeriod, getRawDataForTrend, processDashboardData, processTrendData } from '@/lib/data';
-import type { DashboardState, AnalysisMode, DashboardData, TrendData } from '@/lib/types';
-
-interface DashboardActions {
-  setPeriod: (periodId: string) => void;
-  setComparePeriod: (periodId: string) => void;
-  setAnalysisMode: (mode: AnalysisMode) => void;
-  setSelectedBusinessTypes: (types: string[]) => void;
-}
-
-interface DashboardContextValue {
-  state: DashboardState;
-  actions: DashboardActions;
-  loading: boolean;
-  isReady: boolean;
-}
-
-const DashboardContext = createContext<DashboardContextValue | undefined>(undefined);
-
-export const useDashboard = () => {
-  const context = useContext(DashboardContext);
-  if (context === undefined) {
-    throw new Error('useDashboard must be used within a Dashboard component context');
-  }
-  return context;
-};
+import type { DashboardState, AnalysisMode } from '@/lib/types';
 
 function DashboardContent() {
   const { state, loading, isReady } = useDashboard();
 
-  // This loader is now just for data fetching, not for authentication.
   if (loading || !isReady) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -70,7 +46,7 @@ function DashboardContent() {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth(); // Auth is handled by the provider, just grab the user if needed later.
+  const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -88,7 +64,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   
-  // This effect now only fetches initial filter options once the user is confirmed.
   useEffect(() => {
     if (user) {
       setLoading(true);
@@ -102,7 +77,7 @@ export default function DashboardPage() {
         setIsReady(true);
       });
     }
-  }, [user, searchParams]); // Depends on user to trigger the initial fetch.
+  }, [user, searchParams]);
 
   const updateURL = useCallback(() => {
     if (!isReady) return;
@@ -145,15 +120,13 @@ export default function DashboardPage() {
     fetchData();
   }, [isReady, state.currentPeriod, state.comparePeriod, state.selectedBusinessTypes, state.analysisMode]);
   
-  const actions: DashboardActions = {
-    setPeriod: (periodId) => setState(s => ({ ...s, currentPeriod: periodId })),
+  const actions = {
+    setPeriod: (periodId: string) => setState(s => ({ ...s, currentPeriod: periodId })),
     setComparePeriod: (periodId) => setState(s => ({ ...s, comparePeriod: periodId })),
-    setAnalysisMode: (mode) => setState(s => ({ ...s, analysisMode: mode })),
-    setSelectedBusinessTypes: (types) => setState(s => ({ ...s, selectedBusinessTypes: types })),
+    setAnalysisMode: (mode: AnalysisMode) => setState(s => ({ ...s, analysisMode: mode })),
+    setSelectedBusinessTypes: (types: string[]) => setState(s => ({ ...s, selectedBusinessTypes: types })),
   };
 
-  // The main loading UI is now handled by AuthProvider.
-  // This component will only render once auth is confirmed.
   return (
     <DashboardContext.Provider value={{ state, actions, loading, isReady }}>
       <DashboardContent />
