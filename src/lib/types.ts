@@ -11,10 +11,14 @@ export type BusinessLineData = {
   claimFrequency: number;
 };
 
-export type PeriodData = {
+export type Period = {
   id: string;
   name: string;
-  data: BusinessLineData[];
+};
+
+export type BusinessLine = {
+  id: string;
+  name: string;
 };
 
 export type KpiKey = keyof Omit<BusinessLineData, 'id' | 'name'>;

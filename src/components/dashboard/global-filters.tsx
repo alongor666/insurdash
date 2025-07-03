@@ -10,32 +10,54 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Check, ChevronsUpDown, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { MOCK_PERIODS, MOCK_BUSINESS_LINES } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
+import type { Period, BusinessLine } from '@/lib/types';
 
-export default function GlobalFilters() {
+interface GlobalFiltersProps {
+  periods: Period[];
+  businessLines: BusinessLine[];
+}
+
+export default function GlobalFilters({ periods, businessLines }: GlobalFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [currentPeriodId, setCurrentPeriodId] = useState(searchParams.get('cp') || MOCK_PERIODS[0].id);
-  const [comparePeriodId, setComparePeriodId] = useState(searchParams.get('pp') || MOCK_PERIODS[1].id);
+  const [currentPeriodId, setCurrentPeriodId] = useState(searchParams.get('cp') || '');
+  const [comparePeriodId, setComparePeriodId] = useState(searchParams.get('pp') || '');
   const [analysisMode, setAnalysisMode] = useState(searchParams.get('mode') || 'ytd');
-  const [selectedLines, setSelectedLines] = useState<string[]>(searchParams.get('bl')?.split(',') || MOCK_BUSINESS_LINES.map(l => l.id));
+  const [selectedLines, setSelectedLines] = useState<string[]>(searchParams.get('bl')?.split(',') || []);
+
+  useEffect(() => {
+    setCurrentPeriodId(searchParams.get('cp') || '');
+    setComparePeriodId(searchParams.get('pp') || '');
+    setAnalysisMode(searchParams.get('mode') || 'ytd');
+    setSelectedLines(searchParams.get('bl')?.split(',') || []);
+  }, [searchParams]);
 
   const updateURL = useCallback(() => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(searchParams.toString());
     params.set('cp', currentPeriodId);
     params.set('pp', comparePeriodId);
     params.set('mode', analysisMode);
-    params.set('bl', selectedLines.join(','));
-    router.push(`?${params.toString()}`, { scroll: false });
-  }, [currentPeriodId, comparePeriodId, analysisMode, selectedLines, router]);
+    if (selectedLines.length > 0) {
+      params.set('bl', selectedLines.join(','));
+    } else {
+      params.delete('bl');
+    }
+    
+    if (params.toString() !== searchParams.toString()) {
+      router.replace(`?${params.toString()}`, { scroll: false });
+    }
+  }, [currentPeriodId, comparePeriodId, analysisMode, selectedLines, router, searchParams]);
 
   useEffect(() => {
-    updateURL();
-  }, [updateURL]);
+    const hasRequiredParams = currentPeriodId && comparePeriodId && selectedLines.length > 0;
+    if(hasRequiredParams) {
+        updateURL();
+    }
+  }, [currentPeriodId, comparePeriodId, selectedLines, updateURL]);
 
-  const handleSelectAll = () => setSelectedLines(MOCK_BUSINESS_LINES.map(l => l.id));
+  const handleSelectAll = () => setSelectedLines(businessLines.map(l => l.id));
   const handleDeselectAll = () => setSelectedLines([]);
 
   return (
@@ -43,12 +65,12 @@ export default function GlobalFilters() {
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <Label>当前周期</Label>
-          <Select value={currentPeriodId} onValueChange={setCurrentPeriodId}>
+          <Select value={currentPeriodId} onValueChange={setCurrentPeriodId} disabled={periods.length === 0}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="选择周期" />
             </SelectTrigger>
             <SelectContent>
-              {MOCK_PERIODS.map(period => (
+              {periods.map(period => (
                 <SelectItem key={period.id} value={period.id}>{period.name}</SelectItem>
               ))}
             </SelectContent>
@@ -56,12 +78,12 @@ export default function GlobalFilters() {
         </div>
         <div className="flex items-center gap-2">
           <Label>对比周期</Label>
-          <Select value={comparePeriodId} onValueChange={setComparePeriodId}>
+          <Select value={comparePeriodId} onValueChange={setComparePeriodId} disabled={periods.length === 0}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="选择周期" />
             </SelectTrigger>
             <SelectContent>
-              {MOCK_PERIODS.map(period => (
+              {periods.map(period => (
                 <SelectItem key={period.id} value={period.id}>{period.name}</SelectItem>
               ))}
             </SelectContent>
@@ -71,10 +93,10 @@ export default function GlobalFilters() {
           <Label>业务类型</Label>
            <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" className="w-[250px] justify-between">
+              <Button variant="outline" role="combobox" className="w-[250px] justify-between" disabled={businessLines.length === 0}>
                 <span className="truncate">
                   {selectedLines.length === 0 ? "选择业务线..." : 
-                   selectedLines.length === MOCK_BUSINESS_LINES.length ? "所有业务线" : 
+                   selectedLines.length === businessLines.length ? "所有业务线" : 
                    `${selectedLines.length} 个已选`}
                 </span>
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -90,7 +112,7 @@ export default function GlobalFilters() {
                 <CommandList>
                   <CommandEmpty>未找到业务线。</CommandEmpty>
                   <CommandGroup>
-                    {MOCK_BUSINESS_LINES.map((line) => (
+                    {businessLines.map((line) => (
                       <CommandItem
                         key={line.id}
                         onSelect={() => {
@@ -127,7 +149,7 @@ export default function GlobalFilters() {
         </div>
       </div>
       <div className="mt-2 flex flex-wrap gap-1">
-        {MOCK_BUSINESS_LINES.filter(l => selectedLines.includes(l.id)).map(line => (
+        {businessLines.filter(l => selectedLines.includes(l.id)).map(line => (
             <Badge key={line.id} variant="secondary" className="pr-1">
                 {line.name}
                 <button 

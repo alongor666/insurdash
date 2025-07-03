@@ -12,8 +12,8 @@ import ChartsSection from '@/components/dashboard/charts-section';
 import DataTable from '@/components/dashboard/data-table';
 import { Loader2 } from 'lucide-react';
 
-import { MOCK_PERIODS, MOCK_BUSINESS_LINES } from '@/lib/mock-data';
-import type { PeriodData, BusinessLineData } from '@/lib/types';
+import { getPeriods, getBusinessLines, getDashboardData } from '@/lib/data';
+import type { Period, BusinessLine, BusinessLineData } from '@/lib/types';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -21,29 +21,75 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Filter state derived from URL
-  const currentPeriodId = searchParams.get('cp') || MOCK_PERIODS[0].id;
-  const comparePeriodId = searchParams.get('pp') || MOCK_PERIODS[1].id;
-  const analysisMode = searchParams.get('mode') || 'ytd';
-  const selectedBusinessLines = searchParams.get('bl')?.split(',') || MOCK_BUSINESS_LINES.map(bl => bl.id);
+  const [periods, setPeriods] = useState<Period[]>([]);
+  const [businessLines, setBusinessLines] = useState<BusinessLine[]>([]);
+  const [currentPeriodData, setCurrentPeriodData] = useState<BusinessLineData[]>([]);
+  const [comparePeriodData, setComparePeriodData] = useState<BusinessLineData[]>([]);
+
+  const currentPeriodId = searchParams.get('cp');
+  const comparePeriodId = searchParams.get('pp');
+  const selectedBusinessLines = searchParams.get('bl')?.split(',');
 
   useEffect(() => {
-    // If supabase is not configured, run in offline mode
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
+    if (!supabase) return;
 
-    const checkUser = async () => {
+    const checkUserAndFetchData = async () => {
+      setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         router.push('/login');
-      } else {
-        setUser(session.user);
+        return;
+      }
+      setUser(session.user);
+      
+      try {
+        const [fetchedPeriods, fetchedBusinessLines] = await Promise.all([
+          getPeriods(),
+          getBusinessLines()
+        ]);
+
+        setPeriods(fetchedPeriods);
+        setBusinessLines(fetchedBusinessLines);
+
+        const params = new URLSearchParams(searchParams.toString());
+        let needsRedirect = false;
+
+        if (!params.has('cp') && fetchedPeriods.length > 0) {
+          params.set('cp', fetchedPeriods[0].id);
+          needsRedirect = true;
+        }
+        if (!params.has('pp') && fetchedPeriods.length > 1) {
+          params.set('pp', fetchedPeriods[1].id);
+          needsRedirect = true;
+        }
+        if (!params.has('bl') && fetchedBusinessLines.length > 0) {
+          params.set('bl', fetchedBusinessLines.map(bl => bl.id).join(','));
+          needsRedirect = true;
+        }
+
+        if (needsRedirect) {
+          router.replace(`?${params.toString()}`, { scroll: false });
+          // Data fetching will be triggered by the next run of this effect due to searchParams change
+        } else {
+          const dataCp = params.get('cp');
+          const dataPp = params.get('pp');
+          if (dataCp && dataPp) {
+              const [currentData, compareData] = await Promise.all([
+                  getDashboardData(dataCp),
+                  getDashboardData(dataPp)
+              ]);
+              setCurrentPeriodData(currentData);
+              setComparePeriodData(compareData);
+          }
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
         setLoading(false);
       }
     };
-    checkUser();
+    
+    checkUserAndFetchData();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
@@ -54,19 +100,18 @@ export default function DashboardPage() {
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const filteredData = useMemo(() => {
-    const period = MOCK_PERIODS.find(p => p.id === currentPeriodId);
-    if (!period) return [];
-    return period.data.filter(d => selectedBusinessLines.includes(d.id));
-  }, [currentPeriodId, selectedBusinessLines]);
+    if (!selectedBusinessLines) return [];
+    return currentPeriodData.filter(d => selectedBusinessLines.includes(d.id));
+  }, [currentPeriodData, selectedBusinessLines]);
 
   const compareData = useMemo(() => {
-    const period = MOCK_PERIODS.find(p => p.id === comparePeriodId);
-     if (!period) return [];
-    return period.data.filter(d => selectedBusinessLines.includes(d.id));
-  }, [comparePeriodId, selectedBusinessLines]);
+    if (!selectedBusinessLines) return [];
+    return comparePeriodData.filter(d => selectedBusinessLines.includes(d.id));
+  }, [comparePeriodData, selectedBusinessLines]);
 
   if (loading) {
     return (
@@ -80,7 +125,7 @@ export default function DashboardPage() {
     <div className="flex min-h-screen w-full flex-col bg-background">
       <Header user={user} />
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <GlobalFilters />
+        <GlobalFilters periods={periods} businessLines={businessLines} />
         <KpiCardGrid currentData={filteredData} compareData={compareData} />
         <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
             <div className="lg:col-span-2 xl:col-span-3">
