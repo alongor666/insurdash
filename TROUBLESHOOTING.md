@@ -105,33 +105,38 @@ return (
 *   **避免间接检查**: 不要依赖派生出的布尔值（如 `isSupabaseConfigured`）来做类型守卫。
 *   **使用直接的 `null` 检查**: 在任何要使用可为 `null` 的对象的作用域内，首先进行一次 `if (!myObject) return;` 或 `if (!myObject) throw new Error(...)` 的检查。这会明确地告诉 TypeScript，在该检查点之后，`myObject` 的类型已被收窄，不再是 `null`。
 
-## 5. 线上部署后无法登录 (`TypeError: Failed to fetch`)
+## 5. 【已解决】线上部署后无法登录 (`TypeError: Failed to fetch`)
+
+> **[!] 历史问题归档**
+>
+> 这个问题之前是由于**跨域资源共享 (CORS)** 导致的。现在，我们已经通过**架构升级**彻底解决了这个问题，**不再需要配置CORS白名单**。本章节作为历史记录保留，新的解决方案请参考下文。
+
+---
 
 **现象**:
 应用成功部署到 Cloudflare Pages (例如 `https://insurdash.pages.dev`) 后，在登录页面输入用户名和密码，点击登录后无反应或报错。浏览器开发者工具的控制台 (Console) 显示 `TypeError: Failed to fetch` 错误。
 
-**根本原因分析**:
-这是一个 **100% 的跨域资源共享 (CORS) 配置错误**。这不是 Next.js 或 Cloudflare 的问题。
+**根本原因分析 (新架构)**:
+在新的动态部署架构下，登录请求会首先发送到我们自己的后端API路由 (`/api/auth/login`)。这个API路由需要 Supabase 的 URL 和 anon key 才能工作。如果 Cloudflare Pages 的生产环境中没有配置这些环境变量，API 路由就会失败，从而导致前端收到 `Failed to fetch` 或类似的服务器错误。
 
-出于安全策略，浏览器会阻止一个域名（您的网站 `https://insurdash.pages.dev`）下的前端代码向另一个完全不同的域名（您的 Supabase API 地址 `https://<project-id>.supabase.co`）发送请求。
+**核心解决方案：在 Cloudflare Pages 中配置生产环境变量**
 
-为了让这种跨域请求成功，Supabase 服务器必须通过一个特殊的响应头明确告知浏览器：“我信任并允许来自 `https://insurdash.pages.dev` 的请求”。如果缺少这个许可，浏览器就会主动拦截该请求，导致 `Failed to fetch` 错误。
+您 **必须** 亲自登录到您的 Cloudflare 项目后台，手动为生产环境添加必要的 Supabase 环境变量。这是唯一、正确的解决方案。
 
-> **[!] 核心解决方案：此问题无法通过修改代码解决**
->
-> 您 **必须** 亲自登录到您的 Supabase 项目后台，手动完成以下配置。这是唯一、正确的解决方案。
+**解决方案 (Cloudflare后台配置)**:
+您必须在 Cloudflare 仪表盘中，将您的 Supabase 配置作为环境变量添加进去。
 
-**解决方案 (Supabase后台配置)**:
-您必须在 Supabase 仪表盘中，将您的线上应用地址添加为受信任的来源 (Origin)。
-
-1.  登录您的 **Supabase 项目**。
-2.  在左侧导航栏中，点击最下方的**齿轮图标**进入 **Project Settings**。
-3.  在左侧菜单中，选择 **API**。
-4.  在右侧页面中，向下滚动到 **CORS Configuration** (或“跨域资源共享配置”) 板块。
-5.  在 `Additional allowed origins` 的输入框中，**完整地** 添加您部署后的线上 URL。对于您的情况，请输入：
-    ```
-    https://insurdash.pages.dev
-    ```
+1.  登录您的 **Cloudflare 账户**。
+2.  进入您的 **Workers & Pages**，并选择您的应用项目（例如 `insurdash`）。
+3.  在项目页面，点击 **Settings** (设置) 标签页。
+4.  在左侧菜单中，选择 **Environment variables** (环境变量)。
+5.  点击 **Add variable**，配置以下两个**生产环境变量 (Production Environment Variables)**。
+    *   **变量 1**:
+        *   **Variable name**: `NEXT_PUBLIC_SUPABASE_URL`
+        *   **Value**: 粘贴您从 Supabase 项目设置中复制的 **Project URL**。
+    *   **变量 2**:
+        *   **Variable name**: `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+        *   **Value**: 粘贴您从 Supabase 项目设置中复制的 anon **public key**。
 6.  点击 **Save** 保存。
 
-保存后，等待约一分钟让配置生效，然后刷新您的线上应用页面，登录功能即可正常使用。
+保存后，Cloudflare 会自动为您重新部署应用以应用新的环境变量。部署成功后，刷新您的线上应用页面，登录功能即可正常使用。

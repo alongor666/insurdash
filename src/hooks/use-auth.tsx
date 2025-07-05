@@ -9,7 +9,7 @@ import { Loader2 } from 'lucide-react';
 
 type AuthContextType = {
   user: User | null;
-  login: (email: string, pass: string) => Promise<any>;
+  login: (email: string, pass: string) => Promise<{ data: any; error: any; }>;
   logout: () => Promise<void>;
   loading: boolean;
   isSupabaseConfigured: boolean;
@@ -18,7 +18,6 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  // Memoize the client to prevent re-creating it on every render.
   const supabase = useMemo(createClient, []);
   
   const [user, setUser] = useState<User | null>(null);
@@ -27,7 +26,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    // If supabase is not configured, stop loading and do nothing.
     if (!isSupabaseConfigured) {
         setLoading(false);
         return;
@@ -40,7 +38,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // Initial check for the session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
@@ -65,17 +62,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, loading, pathname, router]);
 
-
   const value = {
     user,
-    login: (email: string, pass: string) => {
-        if (!isSupabaseConfigured) throw new Error("Supabase not configured");
-        return supabase.auth.signInWithPassword({ email, password: pass });
+    login: async (email: string, pass: string) => {
+        if (!isSupabaseConfigured) {
+            return { data: null, error: { message: "Supabase is not configured." } };
+        }
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password: pass }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || result.error) {
+                return { data: null, error: { message: result.error || 'Login failed. Please check credentials.' } };
+            }
+
+            const { error: setSessionError } = await supabase.auth.setSession(result.session);
+            if (setSessionError) {
+                return { data: null, error: setSessionError };
+            }
+            
+            // onAuthStateChange will handle user state update and redirect.
+            return { data: { session: result.session }, error: null };
+        } catch (error: any) {
+            console.error('Login request failed:', error);
+            return { data: null, error: { message: error.message || 'An unexpected error occurred.' } };
+        }
     },
     logout: async () => {
         if (!isSupabaseConfigured) throw new Error("Supabase not configured");
         await supabase.auth.signOut();
-        router.push('/login'); // Force redirect after logout
+        router.push('/login');
     },
     loading,
     isSupabaseConfigured
