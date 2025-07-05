@@ -2,7 +2,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
-import { createClient, isSupabaseConfigured as supabaseIsConfigured } from '@/lib/supabase/client';
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import type { Session, User } from '@supabase/supabase-js';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // If supabase is not configured, stop loading and do nothing.
-    if (!supabaseIsConfigured) {
+    if (!isSupabaseConfigured) {
         setLoading(false);
         return;
     }
@@ -69,11 +69,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = {
     user,
     login: (email: string, pass: string) => {
-        if (!supabaseIsConfigured) throw new Error("Supabase not configured");
+        if (!isSupabaseConfigured) throw new Error("Supabase not configured");
         return supabase.auth.signInWithPassword({ email, password: pass });
     },
     logout: async () => {
-        if (!supabaseIsConfigured) throw new Error("Supabase not configured");
+        if (!isSupabaseConfigured) throw new Error("Supabase not configured");
         await supabase.auth.signOut();
         router.push('/login'); // Force redirect after logout
     },
