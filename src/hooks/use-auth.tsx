@@ -1,9 +1,9 @@
 
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase } from '@/lib/supabase/client';
-import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
+import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
+import { createClient, isSupabaseConfigured as supabaseIsConfigured } from '@/lib/supabase/client';
+import type { Session, User } from '@supabase/supabase-js';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
@@ -18,44 +18,49 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  // Memoize the client to prevent re-creating it on every render.
+  const supabase = useMemo(createClient, []);
+  
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
-  const isSupabaseConfigured = !!supabase;
-
   useEffect(() => {
     // If supabase is not configured, stop loading and do nothing.
-    if (!supabase) {
+    if (!supabaseIsConfigured) {
         setLoading(false);
         return;
     }
 
-    // onAuthStateChange fires on load and on auth events.
-    // This is the single source of truth for the user's auth state.
-    const { data: authListener } = supabase.auth.onAuthStateChange(
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null);
         setLoading(false);
       }
     );
 
+    // Initial check for the session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
     return () => {
-      authListener.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
-  }, []);
+  }, [supabase.auth]);
 
   useEffect(() => {
-    if (loading) return; // Wait until the initial auth check is complete
+    if (loading) return; 
 
-    // If not logged in and not already on the login page, redirect there.
-    if (!user && pathname !== '/login') {
+    const isAuthPage = pathname === '/login';
+    
+    if (!user && !isAuthPage) {
       router.push('/login');
     }
     
-    // If logged in and on the login page, redirect to the dashboard.
-    if (user && pathname === '/login') {
+    if (user && isAuthPage) {
       router.push('/');
     }
   }, [user, loading, pathname, router]);
@@ -64,20 +69,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = {
     user,
     login: (email: string, pass: string) => {
-        if (!supabase) throw new Error("Supabase not configured");
+        if (!supabaseIsConfigured) throw new Error("Supabase not configured");
         return supabase.auth.signInWithPassword({ email, password: pass });
     },
     logout: async () => {
-        if (!supabase) throw new Error("Supabase not configured");
-        // The listener will handle user state change and redirect.
+        if (!supabaseIsConfigured) throw new Error("Supabase not configured");
         await supabase.auth.signOut();
+        router.push('/login'); // Force redirect after logout
     },
     loading,
     isSupabaseConfigured
   };
 
-  // While the initial auth check is running, show a global loader.
-  // This prevents content flicker.
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">

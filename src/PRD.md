@@ -46,7 +46,7 @@
   * **UI组件**: ShadCN UI  
   * **样式**: Tailwind CSS  
   * **图表**: Recharts  
-  * **数据请求**: Supabase Client (@supabase/supabase-js)  
+  * **数据请求**: Supabase Client (@supabase/ssr)  
 * **开发环境 (IDE)**:  
   * **平台**: **Project IDX**  
 * **后端/BaaS (Backend as a Service)**:  
@@ -194,18 +194,18 @@ graph TD
   1. **登录表单 (login/page.tsx)**:  
      * 提供“邮箱”和“密码”输入框，以及一个“登录”按钮。  
      * 使用 react-hook-form 和 zod 进行客户端表单验证。  
-     * 如果前端 .env.local 文件中的 Supabase 配置不完整，登录按钮将显示为“服务未配置”且不可用，同时页面会显示错误提示。  
+     * 如果前端环境变量中的 Supabase 配置不完整，登录按钮将显示为“服务未配置”且不可用，同时页面会显示错误提示。  
   2. **登录逻辑 (use-auth.tsx)**:  
      * 点击“登录”后，调用 login 函数。  
-     * login 函数使用 **Supabase 客户端 SDK** 的 supabase.auth.signInWithPassword() 方法来执行登录。  
-     * 登录成功后，Supabase SDK 会自动处理 idToken 和 refreshToken，并将它们安全地存储在浏览器的 localStorage 中。  
-     * 同时，将 Supabase 返回的用户信息（email, uid）存入 React Context 中。  
+     * login 函数使用 **Supabase 客户端 SDK (`@supabase/ssr`)** 的 `supabase.auth.signInWithPassword()` 方法来执行登录。  
+     * 登录成功后，SDK 会自动处理 idToken 和 refreshToken，并将它们安全地存储在浏览器的 localStorage 中。  
+     * 同时，`onAuthStateChange` 监听器会更新 React Context 中的用户信息。  
   3. **会话保持与自动刷新**:  
-     * **Supabase 客户端 SDK 会自动处理会话的保持和令牌的静默刷新**。应用加载时 (AuthProvider)，SDK 会自动检查 localStorage 中的会话。如果 idToken 即将过期，它会在后台无感地使用 refreshToken 获取新的令牌，开发者无需手动干预。  
-     * 使用 supabase.auth.onAuthStateChange() 监听器来响应认证状态的变化，例如，如果会话失效，则自动将用户重定向到登录页面。  
+     * **`@supabase/ssr` SDK 会自动处理会话的保持和令牌的静默刷新**。应用加载时 (`AuthProvider`)，SDK 会自动检查 localStorage 中的会话并验证其有效性。开发者无需手动干预。  
+     * 使用 `supabase.auth.onAuthStateChange()` 监听器来响应认证状态的变化，例如，如果会话失效，则自动将用户重定向到登录页面。  
   4. **登出逻辑**:  
      * 用户点击右上角头像菜单中的“退出登录”按钮。  
-     * logout 函数被调用，调用 **Supabase 客户端 SDK** 的 supabase.auth.signOut() 方法。SDK 会负责清除本地会话，并将用户重定向到登录页面。
+     * logout 函数被调用，调用 **Supabase 客户端 SDK** 的 `supabase.auth.signOut()` 方法。SDK 会负责清除本地会话，并将用户重定向到登录页面。
 
 ### **F-REQ-02: 全局数据筛选与控制 (Global Data Filtering & Controls)**
 

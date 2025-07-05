@@ -1,12 +1,12 @@
 
-import { supabase } from './supabase/client';
+import { createClient } from './supabase/client';
 import type { RawBusinessData, DashboardData, KpiKey, ProcessedBusinessData, TrendData } from './types';
 import { KPIS } from "./kpi-config";
 
 // #region Data Fetching
 
 export async function getFilterOptions(): Promise<{ periods: { id: string, name: string }[], businessTypes: string[] }> {
-    if (!supabase) return { periods: [], businessTypes: [] };
+    const supabase = createClient();
     
     const { data, error } = await supabase
         .from('business_data')
@@ -43,7 +43,8 @@ export async function getFilterOptions(): Promise<{ periods: { id: string, name:
 }
 
 export async function getRawDataForPeriod(periodId: string): Promise<RawBusinessData[]> {
-    if (!supabase || !periodId) return [];
+    const supabase = createClient();
+    if (!periodId) return [];
     
     const { data, error } = await supabase
         .from('business_data')
@@ -62,7 +63,8 @@ export async function getRawDataForTrend(
     endPeriodId: string,
     count: number
 ): Promise<{ period_id: string, period_label: string, current: RawBusinessData[], previous: RawBusinessData[] }[]> {
-    if (!supabase || !endPeriodId) return [];
+    const supabase = createClient();
+    if (!endPeriodId) return [];
 
     const { data: allPeriods, error: allPeriodsError } = await supabase
         .from('business_data')
