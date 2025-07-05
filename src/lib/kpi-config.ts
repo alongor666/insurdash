@@ -1,10 +1,12 @@
+
 import type { KpiKey } from './types';
 
 export const KPI_IDS = [
     'premium_written', 'premium_earned', 'total_loss_amount', 'claim_count',
     'expense_amount', 'policy_count', 'avg_premium_per_policy', 'avg_loss_per_case',
     'premium_earned_ratio', 'expense_ratio', 'loss_ratio', 'claim_frequency',
-    'variable_cost_ratio', 'marginal_contribution_ratio', 'marginal_contribution_amount', 'premium_share'
+    'variable_cost_ratio', 'marginal_contribution_ratio', 'marginal_contribution_amount', 'premium_share',
+    'avg_commercial_index'
 ] as const;
 
 export type KpiConfig = {
