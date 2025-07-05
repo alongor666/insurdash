@@ -369,6 +369,7 @@ graph TD
    * 创建 Supabase 项目，设计 business_data 表，并填充样本数据。  
    * 进入 Project Settings \> API，复制并妥善保管 **Project URL** 和 anon **public key**。  
    * **(重要)** 前往 Authentication \> Policies，为您的 business_data 表**开启并配置行级安全策略 (Row Level Security, RLS)**。一个简单的初始策略是：“只允许已登录的用户 (authenticated users) 读取 business_data 表”。这是保障数据安全的核心！  
+   * **(关键：修复线上登录问题)** 前往 **Project Settings > API**。在 **CORS Configuration** (跨域资源共享配置) 部分，将您应用的生产环境 URL 添加到输入框中。例如：`https://*.pages.dev` (允许所有 Cloudflare Pages 子域名) 或更具体的 `https://insurdash.pages.dev`。**这是解决线上版本无法登录问题的关键步骤。**
 2. **Cloudflare 设置 (关键步骤)**:  
    * 登录 Cloudflare。在主页右侧，找到并复制您的 **Account ID**。
    * 前往 **Workers & Pages**。创建一个新的 Pages 项目，连接到您的 GitHub 仓库，但在构建和部署设置中，选择“无”或“稍后配置”，以**关闭“自动部署”**。

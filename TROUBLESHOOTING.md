@@ -122,3 +122,27 @@ if (!supabase) {
 // 正确: TS 知道这里的 supabase 不为 null
 supabase.auth.signOut();
 ```
+
+## 5. 线上部署后无法登录 (TypeError: Failed to fetch)
+
+**现象**:
+应用成功部署到 Cloudflare Pages 后，在登录页面输入用户名和密码，点击登录后无反应。浏览器开发者工具的控制台 (Console) 显示 `TypeError: Failed to fetch` 错误。
+
+**根本原因分析**:
+这是一个典型的**跨域资源共享 (CORS)** 错误。出于安全策略，浏览器会阻止一个域名（例如 `https://insurdash.pages.dev`）下的前端 JavaScript 代码向另一个完全不同的域名（例如您的 Supabase API 地址 `https://<project-id>.supabase.co`）发送请求。
+
+为了让这种跨域请求成功，Supabase 服务器必须通过一个特殊的响应头 (HTTP Header) 明确告知浏览器：“我信任并允许来自 `https://insurdash.pages.dev` 的请求”。如果缺少这个许可，浏览器就会主动拦截该请求，导致 `Failed to fetch` 错误。
+
+**解决方案**:
+您需要在 Supabase 仪表盘中，将您的线上应用地址添加为受信任的来源 (Origin)。
+
+1.  登录您的 **Supabase 项目**。
+2.  在左侧导航栏中，点击齿轮图标进入 **Project Settings**。
+3.  选择 **API** 菜单。
+4.  向下滚动到 **CORS Configuration** (或“跨域资源共享配置”) 部分。
+5.  在输入框中，添加您部署后的线上 URL。
+    *   **推荐做法**: 如果您只部署这一个项目，可以填入完整的 URL，例如 `https://insurdash.pages.dev`。
+    *   **更灵活的做法**: 如果您未来可能有很多 `*.pages.dev` 的项目，可以使用通配符，例如 `https://*.pages.dev`。
+6.  点击 **Save** 保存。
+
+保存后，刷新您的线上应用页面，登录功能即可正常使用。
