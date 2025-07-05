@@ -60,8 +60,8 @@ jobs:
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           # 必填：您在 Cloudflare 上创建的 Pages 项目名称 (需要在 GitHub Secrets 中配置)
           projectName: ${{ secrets.CF_PROJECT_NAME }}
-          # 必填：构建产物的目录。对于 Next.js 静态导出，目录是 'out'
-          directory: 'out'
+          # 必填：构建产物的目录。对于 Next.js 动态应用，目录是 '.next'
+          directory: '.next'
           # 可选但推荐：用于在 Cloudflare 部署日志中正确关联提交信息
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
           # 可选：明确指定这是对生产分支的部署
