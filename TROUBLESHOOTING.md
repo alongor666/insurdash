@@ -93,35 +93,17 @@ return (
 在 `npm run build` 或 GitHub Actions 部署过程中，构建失败并抛出 TypeScript 错误 `Type error: 'supabase' is possibly 'null'`。
 
 **根本原因分析**:
-这个问题的根源在于 Supabase 客户端的**条件初始化**。在 `src/lib/supabase/client.ts` 文件中，只有当环境变量 `NEXT_PUBLIC_SUPABASE_URL` 和 `NEXT_PUBLIC_SUPABASE_ANON_KEY` 都存在时，`supabase` 对象才会被创建。否则，它将保持为 `null`。
+这个问题的根源在于 Supabase 客户端的**条件初始化**。在旧的实现中（使用`@supabase/supabase-js`），只有当环境变量存在时，`supabase` 对象才会被创建。否则，它将保持为 `null`。
 
-虽然应用的其他部分（如 `use-auth.tsx`）尝试通过 `const isSupabaseConfigured = !!supabase;` 来检查配置状态，但 TypeScript 的静态类型分析器无法将 `isSupabaseConfigured` 为 `true` 这个事实，关联到 `supabase` 对象不再是 `null`。因此，在后续代码中直接调用 `supabase.auth` 等方法时，TypeScript 仍然会认为 `supabase` 有可能是 `null`，从而抛出类型错误。
+虽然应用的其他部分尝试通过 `const isSupabaseConfigured = !!supabase;` 来检查配置状态，但 TypeScript 的静态类型分析器无法将此间接检查关联到 `supabase` 对象不再是 `null` 的事实，从而抛出类型错误。
 
 **解决方案与最佳实践**:
-解决此问题的核心是进行**直接的、让 TypeScript 能够理解的类型收窄 (Type Narrowing)**。
+此问题已通过**升级到 `@supabase/ssr` 库**得到根本解决。新的 `createClient()` 函数模式确保了即使环境变量缺失，也会返回一个符合类型定义的对象（尽管它会抛出运行时错误），从而避免了编译时类型错误。
+
+如果您在其他地方遇到类似问题，请遵循以下原则：
 
 *   **避免间接检查**: 不要依赖派生出的布尔值（如 `isSupabaseConfigured`）来做类型守卫。
-*   **使用直接的 `null` 检查**: 在任何要使用 `supabase` 对象的函数或 `useEffect` 的作用域内，首先进行一次 `if (!supabase) return;` 或 `if (!supabase) throw new Error(...)` 的检查。这会明确地告诉 TypeScript，在该检查点之后的所有代码路径中，`supabase` 的类型都被收窄为 `SupabaseClient`，不再是 `SupabaseClient | null`。
-
-**错误示例**:
-```typescript
-const isConfigured = !!supabase;
-if (!isConfigured) return;
-
-// TS 错误: 'supabase' 仍可能是 'null'
-supabase.auth.signOut();
-```
-
-**正确示例**:
-```typescript
-if (!supabase) {
-    console.error("Supabase not configured");
-    return;
-}
-
-// 正确: TS 知道这里的 supabase 不为 null
-supabase.auth.signOut();
-```
+*   **使用直接的 `null` 检查**: 在任何要使用可为 `null` 的对象的作用域内，首先进行一次 `if (!myObject) return;` 或 `if (!myObject) throw new Error(...)` 的检查。这会明确地告诉 TypeScript，在该检查点之后，`myObject` 的类型已被收窄，不再是 `null`。
 
 ## 5. 线上部署后无法登录 (`TypeError: Failed to fetch`)
 
