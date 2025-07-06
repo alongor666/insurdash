@@ -1,15 +1,16 @@
 
-import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/ssr';
+import { createClient } from '@/utils/supabase/route';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
+  const supabase = createClient();
   const { email, password } = await req.json();
-  const supabase = createRouteHandlerClient({ cookies });
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-  // Cookie is automatically set by the library
-  return NextResponse.json({ ok: true });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 401 });
+  }
+
+  return NextResponse.json({ message: 'Login successful' }, { status: 200 });
 }

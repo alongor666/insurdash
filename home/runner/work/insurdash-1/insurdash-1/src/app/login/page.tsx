@@ -1,44 +1,40 @@
 
 'use client';
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/use-auth';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (user) {
-      router.push('/');
-    }
-  }, [user, router]);
-
-
-  async function handle(e: React.FormEvent<HTMLFormElement>) {
+  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     const form = new FormData(e.currentTarget);
+
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(Object.fromEntries(form)),
       headers: { 'Content-Type': 'application/json' },
     });
+    
+    setLoading(false);
+
     if (res.ok) {
         // The onAuthStateChange in AuthProvider will handle the redirect
-        // No need for manual redirect here
+        // to the dashboard page upon successful login.
+        router.refresh(); // Refresh the page to let middleware and auth provider detect the session
     } else {
-        alert('登录失败');
+        const { error } = await res.json();
+        alert(`登录失败: ${error}`);
     }
-    setLoading(false);
   }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="w-full max-w-sm p-8 space-y-6 bg-white rounded-lg shadow-md">
             <h1 className="text-2xl font-bold text-center text-gray-900">登录</h1>
-            <form onSubmit={handle} className="space-y-6">
+            <form onSubmit={handleLogin} className="space-y-6">
                 <div>
                     <label htmlFor="email" className="text-sm font-medium text-gray-700 sr-only">邮箱</label>
                     <input className="w-full px-4 py-2 text-gray-700 bg-gray-100 border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" name="email" type="email" placeholder="邮箱" required />

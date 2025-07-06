@@ -1,3 +1,4 @@
-// This file is being replaced by the new modular approach.
-// The new client for browser-side usage is located at /src/utils/supabase/client.ts
+// This file is deprecated and has been replaced by the modular Supabase clients
+// located in /src/utils/supabase/.
+// This file can be safely deleted.
 export {};
