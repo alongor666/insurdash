@@ -13,7 +13,7 @@ import KpiCardGrid from '@/components/dashboard/kpi-card-grid';
 import ChartsSection from '@/components/dashboard/charts-section';
 import DataTable from '@/components/dashboard/data-table';
 import { getFilterOptions, getRawDataForPeriod, getRawDataForTrend, processDashboardData, processTrendData } from '@/lib/data';
-import type { DashboardState, AnalysisMode, RawBusinessData } from '@/lib/types';
+import type { DashboardState, AnalysisMode } from '@/lib/types';
 import { useToast } from "@/hooks/use-toast";
 
 function DashboardContent() {
@@ -78,8 +78,6 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user && !isReady) {
       getFilterOptions().then(({ periods, businessTypes }) => {
-        // We read the searchParams object directly on initialization.
-        // We do NOT add `searchParams` to the dependency array to avoid re-running this.
         const urlCp = searchParams.get('cp');
         const urlPp = searchParams.get('pp');
         const urlMode = searchParams.get('mode') as AnalysisMode | null;
@@ -94,7 +92,7 @@ export default function DashboardPage() {
         setIsReady(true);
       });
     }
-  }, [user, isReady]); // Intentionally omitting searchParams
+  }, [user, isReady, searchParams]); // searchParams is needed for initial load.
 
   // Effect for syncing STATE TO URL
   const updateURL = useCallback(() => {
@@ -114,7 +112,6 @@ export default function DashboardPage() {
         params.set('bl', state.selectedBusinessTypes.join(','));
     }
 
-    // Using router.replace keeps the browser history clean
     router.replace(`?${params.toString()}`, { scroll: false });
   }, [isReady, state.currentPeriod, state.comparePeriod, state.analysisMode, state.selectedBusinessTypes, state.businessTypes, router, searchParams]);
 
@@ -135,31 +132,27 @@ export default function DashboardPage() {
         const prevPeriodId = (currentPeriodIndex > -1 && currentPeriodIndex + 1 < periods.length) ? periods[currentPeriodIndex + 1].id : undefined;
         const prev2PeriodId = (currentPeriodIndex > -1 && currentPeriodIndex + 2 < periods.length) ? periods[currentPeriodIndex + 2].id : undefined;
 
-        const periodIdsToFetch = new Set<string>([currentPeriod]);
-        if (prevPeriodId) periodIdsToFetch.add(prevPeriodId);
-        if (prev2PeriodId) periodIdsToFetch.add(prev2PeriodId);
-        if (analysisMode === 'comparison' && comparePeriod) periodIdsToFetch.add(comparePeriod);
-        
-        const trendRawPromise = getRawDataForTrend(currentPeriod, 15);
-        
-        const rawDataPromises = Array.from(periodIdsToFetch).map(id => getRawDataForPeriod(id));
-        
-        const [trendRaw, ...allRawDataArrays] = await Promise.all([trendRawPromise, ...rawDataPromises]);
-        
-        const allPeriodData = allRawDataArrays.reduce((acc, dataArray) => {
-            if (dataArray.length > 0) {
-                acc[dataArray[0].period_id] = dataArray;
-            }
-            return acc;
-        }, {} as Record<string, RawBusinessData[]>);
+        const [
+            currentRaw,
+            prevCurrentRaw,
+            prev2CurrentRaw,
+            compareRaw,
+            trendRaw,
+        ] = await Promise.all([
+            getRawDataForPeriod(currentPeriod),
+            prevPeriodId ? getRawDataForPeriod(prevPeriodId) : Promise.resolve([]),
+            prev2PeriodId ? getRawDataForPeriod(prev2PeriodId) : Promise.resolve([]),
+            analysisMode === 'comparison' ? getRawDataForPeriod(comparePeriod) : Promise.resolve([]),
+            getRawDataForTrend(currentPeriod, 15)
+        ]);
         
         const processed = processDashboardData({
-            allPeriodData,
-            currentPeriodId: currentPeriod,
-            comparePeriodId: comparePeriod,
-            analysisMode,
+            currentPeriodRawData: currentRaw,
+            comparePeriodRawData: compareRaw,
+            prevCurrentPeriodRawData: prevCurrentRaw,
+            prev2PeriodRawData: prev2CurrentRaw,
             selectedBusinessTypes,
-            periods
+            analysisMode
         });
         
         const processedTrendData = processTrendData(trendRaw, selectedBusinessTypes);
@@ -172,12 +165,11 @@ export default function DashboardPage() {
             description: "无法加载新数据，请检查您的网络连接或稍后再试。",
             variant: "destructive",
         });
-        // We do NOT set processedData to null here, to avoid unmounting children.
       }
     };
   
     fetchData();
-  }, [isReady, state.currentPeriod, state.comparePeriod, state.selectedBusinessTypes, state.analysisMode, toast]);
+  }, [isReady, state.currentPeriod, state.comparePeriod, state.selectedBusinessTypes, state.analysisMode, toast, state.periods]);
   
   const actions = {
     setPeriod: (periodId: string) => setState(s => ({ ...s, currentPeriod: periodId })),
