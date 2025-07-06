@@ -105,7 +105,7 @@ graph TD
   - *详见模块文档: [[docs/chart-bubble.md]]*
 - **F-REQ-14: 图表 - 帕累托分析 (Chart - Pareto Analysis)**: 进行经典的“二八法则”分析。
   - *详见模块文档: [[docs/chart-pareto.md]]*
-
+  
 ## 8. 部署与复刻 (Deployment & Replication)
 本指南提供了从零开始设置、运行和部署应用的**最终、经过验证的生产方案**。
 
