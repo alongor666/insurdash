@@ -1,4 +1,3 @@
-
 # 模块文档：图表 - 业务分布
 
 - **组件路径(s)**: `src/components/dashboard/charts/ranking-chart.tsx`

@@ -1,4 +1,3 @@
-
 # 模块文档：KPI核心指标看板
 
 - **组件路径(s)**: `src/components/dashboard/kpi-card-grid.tsx`, `src/components/dashboard/kpi-card.tsx`

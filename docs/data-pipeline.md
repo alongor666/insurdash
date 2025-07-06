@@ -1,5 +1,4 @@
-
-# 模块文档：数据获取与处理
+# 模块文档：数据获取与处理 (Data Pipeline)
 
 - **组件路径(s)**: `src/lib/data.ts`, `src/lib/supabase/client.ts`, `src/lib/kpi-config.ts`
 - **模块负责人**: `TBD`
@@ -46,7 +45,7 @@
 ## 4. 关系图谱 (Relationship Map)
 - **关联全局宪法 `PRD.md`**:
   - 本模块是 `PRD.md §5.3` 中定义的核心数据模型的直接实现。
-  - 所有KPI的计算逻辑严格遵循 `PRD.md` 附录中的指标字典。
+  - 所有KPI的计算逻辑严格遵循 `PRD.md §9` 中的指标字典。
 - **与其他模块的交互**:
   - **被依赖**:
     - `dashboard-context.md`: 强依赖，调用本模块的数据获取和处理函数来驱动整个应用。

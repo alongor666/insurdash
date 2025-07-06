@@ -1,4 +1,3 @@
-
 # 模块文档：全局筛选器
 
 - **组件路径(s)**: `src/components/dashboard/global-filters.tsx`

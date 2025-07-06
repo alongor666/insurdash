@@ -1,4 +1,3 @@
-
 # 模块文档：图表 - 贡献度分析
 
 - **组件路径(s)**: `src/components/dashboard/charts/contribution-chart.tsx`

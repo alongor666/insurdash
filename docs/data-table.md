@@ -1,4 +1,3 @@
-
 # 模块文档：详细数据表
 
 - **组件路径(s)**: `src/components/dashboard/data-table.tsx`

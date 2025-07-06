@@ -1,4 +1,3 @@
-
 # 模块文档：图表 - 占比分析
 
 - **组件路径(s)**: `src/components/dashboard/charts/ratio-chart.tsx`

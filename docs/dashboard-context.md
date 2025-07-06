@@ -1,4 +1,3 @@
-
 # 模块文档：全局状态管理 (Dashboard Context)
 
 - **组件路径(s)**: `src/hooks/use-dashboard.ts`, `src/app/page.tsx`

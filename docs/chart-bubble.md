@@ -1,4 +1,3 @@
-
 # 模块文档：图表 - 多维气泡图
 
 - **组件路径(s)**: `src/components/dashboard/charts/bubble-chart.tsx`

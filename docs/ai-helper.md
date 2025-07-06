@@ -1,4 +1,3 @@
-
 # 模块文档：AI辅助分析
 
 - **组件路径(s)**: `src/components/dashboard/ai-analysis-modal.tsx`, `src/lib/ai-text-generator.ts`

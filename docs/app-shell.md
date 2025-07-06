@@ -1,4 +1,3 @@
-
 # 模块文档：主应用外壳
 
 - **组件路径(s)**: `src/app/layout.tsx`, `src/app/page.tsx`, `src/components/dashboard/header.tsx`

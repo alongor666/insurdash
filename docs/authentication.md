@@ -1,4 +1,3 @@
-
 # 模块文档：认证 (Authentication)
 
 - **组件路径(s)**: `src/hooks/use-auth.tsx`, `src/app/api/auth/login/route.ts`, `src/app/login/page.tsx`, `src/components/auth/auth-form.tsx`

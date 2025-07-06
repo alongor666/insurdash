@@ -1,4 +1,3 @@
-
 # 模块文档：图表 - 帕累托分析
 
 - **组件路径(s)**: `src/components/dashboard/charts/pareto-chart.tsx`
