@@ -1,3 +1,4 @@
+
 # 常见问题与排查指南
 
 > **[!] 重要提示：关于新的问题追踪流程**
@@ -100,21 +101,12 @@ return (
 **现象**:
 应用成功部署到 Cloudflare Pages (例如 `https://insurdash.pages.dev`) 后，在登录页面输入用户名和密码，点击登录后无反应或报错。浏览器开发者工具的控制台 (Console) 显示 `TypeError: Failed to fetch` 错误。
 
-**根本原因分析**:
-这个问题的根本原因 **100%** 是您部署在 Cloudflare Pages 上的**生产环境缺少必要的环境变量**。
+**根本原因分析 (新架构)**:
+在新的动态部署架构下，登录请求会首先发送到我们自己的后端API路由 (`/api/auth/login`)。这个API路由需要 Supabase 的 URL 和 anon key 才能工作。如果 Cloudflare Pages 的生产环境中没有配置这些环境变量，API 路由就会失败，从而导致前端收到 `Failed to fetch` 或类似的服务器错误。
 
-本应用采用的 **BFF (后端代理) 架构**意味着：
-1.  您的浏览器（客户端）并**不直接**与 Supabase 通信进行登录。
-2.  相反，它会向我们自己的应用后端 `/api/auth/login` 发送一个请求。
-3.  这个后端API路由在 Cloudflare 的服务器上运行，它**代表**您去和 Supabase 进行安全的服务器间认证。
+**核心解决方案：在 Cloudflare Pages 中配置生产环境变量**
 
-为了完成这一步，这个后端API路由**必须**能访问到您的 Supabase 项目 URL 和 anon Key。在本地开发时，它能从 `.env.local` 文件中读取；但在生产环境，它**只能**从您在 Cloudflare Pages 项目设置中配置的环境变量中读取。
-
-如果缺少这些环境变量，API路由就会失败，从而导致前端收到 `Failed to fetch` 错误。
-
-> **[!] 核心解决方案：此问题无法通过修改代码解决**
->
-> 您 **必须** 亲自登录到您的 Cloudflare 项目后台，手动为生产环境添加必要的 Supabase 环境变量。这是唯一、正确的解决方案。
+您 **必须** 亲自登录到您的 Cloudflare 项目后台，手动为生产环境添加必要的 Supabase 环境变量。这是唯一、正确的解决方案。
 
 **解决方案 (Cloudflare后台配置)**:
 您必须在 Cloudflare 仪表盘中，将您的 Supabase 配置作为环境变量添加进去。
@@ -132,4 +124,4 @@ return (
         *   **Value**: 粘贴您从 Supabase 项目设置中复制的 anon **public key**。
 6.  点击 **Save** 保存。
 
-保存后，Cloudflare 会自动为您触发一次新的部署。等待部署完成后，刷新您的线上应用页面，登录功能即可正常使用。
+保存后，等待约一分钟让配置生效，然后刷新您的线上应用页面，登录功能即可正常使用。
