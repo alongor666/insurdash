@@ -32,11 +32,13 @@
 - **`getRawDataForTrend()`**：根据结束周期和数量，获取一个连续时间序列的原始数据。
 
 ### 3.2. 数据处理与计算
-- **`processDashboardData()`**: **核心处理函数**。它接收原始数据和用户筛选条件，然后执行以下操作：
-  1.  根据`analysisMode` (`ytd`或`pop`)决定是否需要计算“当周发生额”。
-  2.  对每个业务线调用`calculateKpis`计算所有KPI。
-  3.  对筛选后的数据进行聚合，计算汇总KPI。
-  4.  返回一个结构化的`DashboardData`对象。
+- **`processDashboardData()`**: **核心处理函数**。它接收一个包含多个周期原始数据和用户筛选条件的对象，然后根据`analysisMode` (`ytd`, `pop`, `comparison`) 执行以下操作：
+    - **`ytd` 模式**: 直接处理当前周期和对比周期的YTD数据。
+    - **`pop` 模式**: 计算当前周期与其上一周期的“当周发生额”，并进行对比。
+    - **`comparison` 模式**: 计算当前周期和自定义对比周期的“当周发生额”，并进行对比。
+    - 对每个业务线调用`calculateKpis`计算所有KPI。
+    - 对筛选后的数据进行聚合，计算汇总KPI。
+    - 返回一个结构化的`DashboardData`对象。
 - **`processTrendData()`**: 专门为趋势图处理数据，为每个历史时间点计算YTD和PoP两种模式下的KPI。
 - **`calculateKpis()`**: **核心计算引擎**。接收单条`RawBusinessData`，计算并返回所有16个核心KPI。
 - **`aggregateRawData()`**: 将多条业务线数据聚合成一条总和数据，并正确计算加权平均指标。

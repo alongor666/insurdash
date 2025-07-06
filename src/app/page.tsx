@@ -12,7 +12,7 @@ import KpiCardGrid from '@/components/dashboard/kpi-card-grid';
 import ChartsSection from '@/components/dashboard/charts-section';
 import DataTable from '@/components/dashboard/data-table';
 import { getFilterOptions, getRawDataForPeriod, getRawDataForTrend, processDashboardData, processTrendData } from '@/lib/data';
-import type { DashboardState, AnalysisMode } from '@/lib/types';
+import type { DashboardState, AnalysisMode, RawBusinessData } from '@/lib/types';
 
 function DashboardContent() {
   const { state, loading, isReady } = useDashboard();
@@ -83,7 +83,11 @@ export default function DashboardPage() {
     if (!isReady) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set('cp', state.currentPeriod);
-    params.set('pp', state.comparePeriod);
+    if(state.analysisMode !== 'pop') {
+      params.set('pp', state.comparePeriod);
+    } else {
+      params.delete('pp');
+    }
     params.set('mode', state.analysisMode);
     params.set('bl', state.selectedBusinessTypes.join(','));
     router.replace(`?${params.toString()}`, { scroll: false });
@@ -94,23 +98,49 @@ export default function DashboardPage() {
   }, [updateURL]);
 
   useEffect(() => {
-    if (!isReady || !state.currentPeriod || !state.comparePeriod) return;
-
+    if (!isReady || !state.currentPeriod) return;
+  
     setLoading(true);
     const fetchData = async () => {
       try {
-        const [currentRaw, compareRaw, trendRaw] = await Promise.all([
-          getRawDataForPeriod(state.currentPeriod),
-          getRawDataForPeriod(state.comparePeriod),
-          getRawDataForTrend(state.currentPeriod, 15)
-        ]);
+        const { currentPeriod, comparePeriod, analysisMode, selectedBusinessTypes } = state;
+  
+        const trendRawPromise = getRawDataForTrend(currentPeriod, 15);
+        const currentRawPromise = getRawDataForPeriod(currentPeriod);
         
-        // Pass the period before the compare period for accurate PoP calculation
-        const comparePeriodPreviousRaw = await getRawDataForPeriod(compareRaw[0]?.comparison_period_id_mom || '');
+        const [trendRaw, currentRaw] = await Promise.all([trendRawPromise, currentRawPromise]);
+  
+        const currentPrevId = currentRaw[0]?.comparison_period_id_mom;
+        const currentPrevRaw = currentPrevId ? await getRawDataForPeriod(currentPrevId) : [];
+  
+        let compareRaw: RawBusinessData[] = [];
+        let comparePrevRaw: RawBusinessData[] = [];
+  
+        if (analysisMode === 'ytd') {
+            if(comparePeriod) compareRaw = await getRawDataForPeriod(comparePeriod);
+        } else if (analysisMode === 'comparison') {
+            if(comparePeriod) {
+                compareRaw = await getRawDataForPeriod(comparePeriod);
+                const comparePrevId = compareRaw[0]?.comparison_period_id_mom;
+                comparePrevRaw = comparePrevId ? await getRawDataForPeriod(comparePrevId) : [];
+            }
+        } else if (analysisMode === 'pop') {
+            compareRaw = currentPrevRaw;
+            const comparePrevId = compareRaw[0]?.comparison_period_id_mom;
+            comparePrevRaw = comparePrevId ? await getRawDataForPeriod(comparePrevId) : [];
+        }
+  
+        const processed = processDashboardData({
+            currentPeriodRawData: currentRaw,
+            comparePeriodRawData: compareRaw,
+            prevCurrentPeriodRawData: currentPrevRaw,
+            prevComparePeriodRawData: comparePrevRaw,
+            selectedBusinessTypes,
+            analysisMode
+        });
         
-        const processed = processDashboardData(currentRaw, compareRaw, state.selectedBusinessTypes, state.analysisMode);
-        const processedTrendData = processTrendData(trendRaw, state.selectedBusinessTypes);
-        
+        const processedTrendData = processTrendData(trendRaw, selectedBusinessTypes);
+  
         setState(s => ({ ...s, processedData: processed, trendData: processedTrendData }));
       } catch (error) {
         console.error("Failed to fetch or process dashboard data:", error);
@@ -119,7 +149,7 @@ export default function DashboardPage() {
         setLoading(false);
       }
     };
-
+  
     fetchData();
   }, [isReady, state.currentPeriod, state.comparePeriod, state.selectedBusinessTypes, state.analysisMode]);
   

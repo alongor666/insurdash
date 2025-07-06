@@ -4,14 +4,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDashboard } from '@/hooks/use-dashboard';
 import { ChevronsUpDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import type { AnalysisMode } from '@/lib/types';
 
 interface GlobalFiltersProps {
   periods: { id: string, name: string }[];
@@ -69,7 +69,7 @@ export default function GlobalFilters({ periods, businessTypes }: GlobalFiltersP
 
   return (
     <div className="sticky top-[65px] z-30 bg-background/95 backdrop-blur-sm p-4 -mx-4 -mt-4 mb-4 border-b">
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
         <div className="space-y-1">
           <Label>当前周期</Label>
           <Select value={currentPeriod} onValueChange={setPeriod} disabled={periods.length === 0}>
@@ -83,7 +83,7 @@ export default function GlobalFilters({ periods, businessTypes }: GlobalFiltersP
         </div>
         <div className="space-y-1">
           <Label>对比周期</Label>
-          <Select value={comparePeriod} onValueChange={setComparePeriod} disabled={periods.length === 0}>
+          <Select value={comparePeriod} onValueChange={setComparePeriod} disabled={periods.length === 0 || analysisMode === 'pop'}>
             <SelectTrigger><SelectValue placeholder="选择周期" /></SelectTrigger>
             <SelectContent>
               {periods.map(period => (
@@ -147,14 +147,26 @@ export default function GlobalFilters({ periods, businessTypes }: GlobalFiltersP
               </PopoverContent>
             </Popover>
         </div>
-        <div className="flex items-center justify-center space-x-2 pt-6">
-            <Label htmlFor="analysis-mode" className={cn(analysisMode !== 'pop' && "text-muted-foreground")}>当周(PoP)</Label>
-            <Switch
-                id="analysis-mode"
-                checked={analysisMode === 'ytd'}
-                onCheckedChange={(checked) => setAnalysisMode(checked ? 'ytd' : 'pop')}
-            />
-            <Label htmlFor="analysis-mode" className={cn(analysisMode !== 'ytd' && "text-muted-foreground")}>累计(YTD)</Label>
+        <div className="space-y-1">
+            <Label>分析模式</Label>
+            <RadioGroup
+              value={analysisMode}
+              onValueChange={(v) => setAnalysisMode(v as AnalysisMode)}
+              className="flex items-center space-x-4 h-10"
+            >
+              <div className="flex items-center space-x-1">
+                <RadioGroupItem value="ytd" id="ytd" />
+                <Label htmlFor="ytd" className="font-normal text-sm">年累计</Label>
+              </div>
+              <div className="flex items-center space-x-1">
+                <RadioGroupItem value="pop" id="pop" />
+                <Label htmlFor="pop" className="font-normal text-sm">当周</Label>
+              </div>
+              <div className="flex items-center space-x-1">
+                <RadioGroupItem value="comparison" id="comparison" />
+                <Label htmlFor="comparison" className="font-normal text-sm">对比</Label>
+              </div>
+            </RadioGroup>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 
 import { createClient } from './supabase/client';
-import type { RawBusinessData, DashboardData, KpiKey, ProcessedBusinessData, TrendData } from './types';
+import type { RawBusinessData, DashboardData, KpiKey, ProcessedBusinessData, TrendData, AnalysisMode } from './types';
 import { KPIS } from "./kpi-config";
 
 // #region Data Fetching
@@ -234,11 +234,11 @@ function aggregateRawData(data: RawBusinessData[]): RawBusinessData {
     
     return {
         ...aggregated,
-        period_id: data[0].period_id,
-        period_label: data[0].period_label,
+        period_id: data[0]?.period_id || '',
+        period_label: data[0]?.period_label || '',
         business_type: 'Aggregated',
-        comparison_period_id_mom: data[0].comparison_period_id_mom,
-        totals_for_period: data[0].totals_for_period,
+        comparison_period_id_mom: data[0]?.comparison_period_id_mom || '',
+        totals_for_period: data[0]?.totals_for_period || { total_premium_written_overall: 0 },
         // avg_commercial_index is not meaningful when aggregated, except for single business type selection
         avg_commercial_index: data.length === 1 ? data[0].avg_commercial_index : 0,
     };
@@ -272,25 +272,43 @@ function calculatePeriodOverPeriod(current: RawBusinessData[], previous: RawBusi
     });
 }
 
+interface ProcessDataParams {
+    currentPeriodRawData: RawBusinessData[];
+    comparePeriodRawData: RawBusinessData[];
+    prevCurrentPeriodRawData: RawBusinessData[];
+    prevComparePeriodRawData: RawBusinessData[];
+    selectedBusinessTypes: string[];
+    analysisMode: AnalysisMode;
+}
 
-export function processDashboardData(
-    currentPeriodRawData: RawBusinessData[],
-    comparePeriodRawData: RawBusinessData[],
-    selectedBusinessTypes: string[],
-    analysisMode: 'ytd' | 'pop'
-): DashboardData {
-
+export function processDashboardData({
+    currentPeriodRawData,
+    comparePeriodRawData,
+    prevCurrentPeriodRawData,
+    prevComparePeriodRawData,
+    selectedBusinessTypes,
+    analysisMode,
+}: ProcessDataParams): DashboardData {
     const currentFiltered = currentPeriodRawData.filter(d => selectedBusinessTypes.includes(d.business_type));
     const compareFiltered = comparePeriodRawData.filter(d => selectedBusinessTypes.includes(d.business_type));
+    const prevCurrentFiltered = prevCurrentPeriodRawData.filter(d => selectedBusinessTypes.includes(d.business_type));
+    const prevCompareFiltered = prevComparePeriodRawData.filter(d => selectedBusinessTypes.includes(d.business_type));
 
-    // For PoP, we need the period before the current period to calculate the difference.
-    // The comparison data should be from the period before the compare period.
-    const currentDataForProcessing = analysisMode === 'ytd' 
-        ? currentFiltered
-        : calculatePeriodOverPeriod(currentFiltered, compareFiltered);
+    let currentDataForProcessing: RawBusinessData[];
+    let compareDataForProcessing: RawBusinessData[];
 
-    // The 'compare' data is always calculated in YTD mode for a stable comparison base.
-    const compareDataForProcessing = compareFiltered;
+    if (analysisMode === 'ytd') {
+        currentDataForProcessing = currentFiltered;
+        compareDataForProcessing = compareFiltered;
+    } else { // 'pop' or 'comparison' modes
+        currentDataForProcessing = calculatePeriodOverPeriod(currentFiltered, prevCurrentFiltered);
+        
+        if (analysisMode === 'pop') { // consecutive PoP: current vs current-1
+            compareDataForProcessing = calculatePeriodOverPeriod(prevCurrentFiltered, prevCompareFiltered);
+        } else { // 'comparison' mode: current vs custom compare
+            compareDataForProcessing = calculatePeriodOverPeriod(compareFiltered, prevCompareFiltered);
+        }
+    }
 
     const totalPremiumCurrent = currentPeriodRawData.reduce((sum, item) => sum + (item.premium_written || 0), 0);
     const totalPremiumCompare = comparePeriodRawData.reduce((sum, item) => sum + (item.premium_written || 0), 0);
@@ -298,8 +316,7 @@ export function processDashboardData(
     const byBusinessType = currentDataForProcessing.map(businessLineData => {
         const kpis = calculateKpis(businessLineData);
         kpis.premium_share = safeDivide(kpis.premium_written, totalPremiumCurrent) * 100;
-        // Only show avg_commercial_index for single business type selection in YTD mode
-        if (selectedBusinessTypes.length !== 1 || analysisMode === 'pop') {
+        if (selectedBusinessTypes.length !== 1 || analysisMode !== 'ytd') {
             kpis.avg_commercial_index = 0;
         }
         return { ...businessLineData, kpis };
@@ -310,13 +327,13 @@ export function processDashboardData(
 
     const summaryCurrentKpis = calculateKpis(aggregateCurrent);
     summaryCurrentKpis.premium_share = safeDivide(summaryCurrentKpis.premium_written, totalPremiumCurrent) * 100;
-     if (selectedBusinessTypes.length !== 1 || analysisMode === 'pop') {
+    if (selectedBusinessTypes.length !== 1 || analysisMode !== 'ytd') {
         summaryCurrentKpis.avg_commercial_index = 0;
     }
     
     const summaryCompareKpis = calculateKpis(aggregateCompare);
     summaryCompareKpis.premium_share = safeDivide(summaryCompareKpis.premium_written, totalPremiumCompare) * 100;
-     if (selectedBusinessTypes.length !== 1) { // This should not depend on analysis mode
+    if (selectedBusinessTypes.length !== 1 || analysisMode !== 'ytd') {
         summaryCompareKpis.avg_commercial_index = 0;
     }
 
@@ -336,8 +353,22 @@ export function processTrendData(
     if (!trendRaw || trendRaw.length === 0) return [];
     
     return trendRaw.map(periodData => {
-        const ytdProcessed = processDashboardData(periodData.current, [], selectedBusinessTypes, 'ytd');
-        const popProcessed = processDashboardData(periodData.current, periodData.previous, selectedBusinessTypes, 'pop');
+        const ytdProcessed = processDashboardData({
+            currentPeriodRawData: periodData.current,
+            comparePeriodRawData: [],
+            prevCurrentPeriodRawData: [],
+            prevComparePeriodRawData: [],
+            selectedBusinessTypes,
+            analysisMode: 'ytd'
+        });
+        const popProcessed = processDashboardData({
+            currentPeriodRawData: periodData.current,
+            comparePeriodRawData: [],
+            prevCurrentPeriodRawData: periodData.previous,
+            prevComparePeriodRawData: [],
+            selectedBusinessTypes,
+            analysisMode: 'pop'
+        });
         
         return {
             period_id: periodData.period_id,
@@ -350,7 +381,7 @@ export function processTrendData(
 // #endregion
 
 // #region Formatting and Metrics
-export function formatKpiValue(value: number, unit: '万元' | '%' | '件' | '' | '元', short = false): string {
+export function formatKpiValue(value: number, unit: '万元' | '%' | '件' | '' | '元' | 'p.p.', short = false): string {
     if (value === null || value === undefined || isNaN(value)) {
         return 'N/A';
     }
@@ -372,7 +403,8 @@ export function formatKpiValue(value: number, unit: '万元' | '%' | '件' | '' 
         }
 
         case '%':
-            return `${value.toFixed(1)}%`;
+        case 'p.p.':
+            return `${value.toFixed(1)}${unit}`;
 
         case '': // For avg_commercial_index, which is a coefficient
             return value.toFixed(4); // Keep precision
@@ -387,7 +419,7 @@ export function getComparisonMetrics(kpiId: KpiKey, currentValue: number, previo
     const { positiveChangeIs, unit } = KPIS[kpiId];
     
     const isNew = previousValue === 0 && currentValue !== 0 && previousValue !== currentValue;
-    if (previousValue === 0) {
+    if (previousValue === 0 || !isFinite(previousValue)) {
         return { diff: currentValue, percentageChange: Infinity, isBetter: positiveChangeIs === 'up', isZero: currentValue === 0, isNew, unit };
     }
 

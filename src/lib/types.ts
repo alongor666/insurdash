@@ -57,7 +57,7 @@ export interface TrendData {
     pop_kpis: KpiSet;
 }
 
-export type AnalysisMode = 'ytd' | 'pop';
+export type AnalysisMode = 'ytd' | 'pop' | 'comparison';
 
 export interface DashboardState {
   periods: { id: string; name: string }[];
