@@ -5,21 +5,21 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
-import { useAuth } from '@/hooks/use-auth';
-import { DashboardContext, useDashboard } from '@/hooks/use-dashboard';
-import Header from '@/components/dashboard/header';
-import GlobalFilters from '@/components/dashboard/global-filters';
-import KpiCardGrid from '@/components/dashboard/kpi-card-grid';
-import ChartsSection from '@/components/dashboard/charts-section';
-import DataTable from '@/components/dashboard/data-table';
-import { getFilterOptions, getRawDataForPeriod, getRawDataForTrend, processDashboardData, processTrendData } from '@/lib/data';
-import type { DashboardState, AnalysisMode } from '@/lib/types';
+import { useAuth } from '../../hooks/use-auth';
+import { DashboardContext, useDashboard } from '../../hooks/use-dashboard';
+import Header from '../../components/dashboard/header';
+import GlobalFilters from '../../components/dashboard/global-filters';
+import KpiCardGrid from '../../components/dashboard/kpi-card-grid';
+import ChartsSection from '../../components/dashboard/charts-section';
+import DataTable from '../../components/dashboard/data-table';
+import { getFilterOptions, getRawDataForPeriod, getRawDataForTrend, processDashboardData, processTrendData } from '../../lib/data';
+import type { DashboardState, AnalysisMode } from '../../lib/types';
 import { useToast } from "@/hooks/use-toast";
 
 function DashboardContent() {
-  const { state, isReady } = useDashboard();
+  const { state, loading, isReady } = useDashboard();
 
-  if (!isReady) {
+  if (loading || !isReady) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -72,6 +72,7 @@ export default function DashboardPage() {
     trendData: [],
   });
   
+  const [loading, setLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   
   // Effect for ONE-TIME initialization from URL params
@@ -92,7 +93,7 @@ export default function DashboardPage() {
         setIsReady(true);
       });
     }
-  }, [user, isReady, searchParams]); // searchParams is needed for initial load.
+  }, [user, isReady, searchParams]); 
 
   // Effect for syncing STATE TO URL
   const updateURL = useCallback(() => {
@@ -123,6 +124,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!isReady || !state.currentPeriod) return;
   
+    setLoading(true);
     const fetchData = async () => {
       try {
         const { currentPeriod, comparePeriod, analysisMode, selectedBusinessTypes, periods } = state;
@@ -165,6 +167,8 @@ export default function DashboardPage() {
             description: "无法加载新数据，请检查您的网络连接或稍后再试。",
             variant: "destructive",
         });
+      } finally {
+        setLoading(false);
       }
     };
   
@@ -179,7 +183,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <DashboardContext.Provider value={{ state, actions, isReady }}>
+    <DashboardContext.Provider value={{ state, actions, loading, isReady }}>
       <DashboardContent />
     </DashboardContext.Provider>
   );
