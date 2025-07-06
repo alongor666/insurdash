@@ -5,15 +5,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
-import { useAuth } from '../hooks/use-auth';
-import { DashboardContext, useDashboard } from '../hooks/use-dashboard';
-import Header from '../components/dashboard/header';
-import GlobalFilters from '../components/dashboard/global-filters';
-import KpiCardGrid from '../components/dashboard/kpi-card-grid';
-import ChartsSection from '../components/dashboard/charts-section';
-import DataTable from '../components/dashboard/data-table';
-import { getFilterOptions, getRawDataForPeriod, getRawDataForTrend, processDashboardData, processTrendData } from '../lib/data';
-import type { DashboardState, AnalysisMode } from '../lib/types';
+import { useAuth } from '@/hooks/use-auth';
+import { DashboardContext, useDashboard } from '@/hooks/use-dashboard';
+import Header from '@/components/dashboard/header';
+import GlobalFilters from '@/components/dashboard/global-filters';
+import KpiCardGrid from '@/components/dashboard/kpi-card-grid';
+import ChartsSection from '@/components/dashboard/charts-section';
+import DataTable from '@/components/dashboard/data-table';
+import { getFilterOptions, getRawDataForPeriod, getRawDataForTrend, processDashboardData, processTrendData } from '@/lib/data';
+import type { DashboardState, AnalysisMode } from '@/lib/types';
 import { useToast } from "@/hooks/use-toast";
 
 function DashboardContent() {
