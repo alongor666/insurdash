@@ -18,7 +18,7 @@ import type { DashboardState, AnalysisMode, RawBusinessData } from '@/lib/types'
 function DashboardContent() {
   const { state, loading, isReady } = useDashboard();
 
-  if (loading || !isReady) {
+  if (!isReady) { // Loader for initial setup (fetching periods, etc.)
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -34,13 +34,28 @@ function DashboardContent() {
   } = state;
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-background">
+    <div className="relative flex min-h-screen w-full flex-col bg-background">
+      {/* Loading overlay for subsequent data fetches to avoid unmounting children */}
+      {loading && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+      )}
       <Header />
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <GlobalFilters periods={periods} businessTypes={businessTypes} />
-        {processedData && <KpiCardGrid processedData={processedData} />}
-        {processedData && <ChartsSection processedData={processedData} trendData={trendData} />}
-        {processedData && <DataTable processedData={processedData} />}
+        {processedData ? (
+          <>
+            <KpiCardGrid processedData={processedData} />
+            <ChartsSection processedData={processedData} trendData={trendData} />
+            <DataTable processedData={processedData} />
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground p-8">
+            {/* Show message only if not loading, otherwise the overlay is shown */}
+            {!loading && <p>没有可用于当前筛选的数据。</p>}
+          </div>
+        )}
       </main>
     </div>
   );
@@ -68,10 +83,15 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user) {
       getFilterOptions().then(({ periods, businessTypes }) => {
-        const currentPeriod = searchParams.get('cp') || (periods[0]?.id ?? '');
-        const comparePeriod = searchParams.get('pp') || (periods[1]?.id ?? '');
-        const analysisMode = (searchParams.get('mode') as AnalysisMode) || 'ytd';
-        const selectedBusinessTypes = searchParams.get('bl')?.split(',') || businessTypes;
+        const urlCp = searchParams.get('cp');
+        const urlPp = searchParams.get('pp');
+        const urlMode = searchParams.get('mode') as AnalysisMode | null;
+        const urlBl = searchParams.get('bl');
+
+        const currentPeriod = urlCp || (periods[0]?.id ?? '');
+        const comparePeriod = urlPp || (periods[1]?.id ?? '');
+        const analysisMode = urlMode || 'ytd';
+        const selectedBusinessTypes = urlBl ? urlBl.split(',') : businessTypes;
         
         setState(s => ({ ...s, periods, businessTypes, currentPeriod, comparePeriod, analysisMode, selectedBusinessTypes }));
         setIsReady(true);
@@ -89,9 +109,15 @@ export default function DashboardPage() {
         params.delete('pp');
     }
     params.set('mode', state.analysisMode);
-    params.set('bl', state.selectedBusinessTypes.join(','));
+    
+    if (state.businessTypes.length > 0 && state.selectedBusinessTypes.length === state.businessTypes.length) {
+        params.delete('bl');
+    } else {
+        params.set('bl', state.selectedBusinessTypes.join(','));
+    }
+
     router.replace(`?${params.toString()}`, { scroll: false });
-  }, [isReady, state.currentPeriod, state.comparePeriod, state.analysisMode, state.selectedBusinessTypes, router, searchParams]);
+  }, [isReady, state.currentPeriod, state.comparePeriod, state.analysisMode, state.selectedBusinessTypes, state.businessTypes, router, searchParams]);
 
   useEffect(() => {
     updateURL();
@@ -105,41 +131,32 @@ export default function DashboardPage() {
       try {
         const { currentPeriod, comparePeriod, analysisMode, selectedBusinessTypes, periods } = state;
 
-        // Determine all unique period IDs we need to fetch
         const neededPeriodIds = new Set<string>();
         neededPeriodIds.add(currentPeriod);
         
         const currentPeriodIndex = periods.findIndex(p => p.id === currentPeriod);
 
-        // For 'ytd' and 'pop', we need the previous period
-        if (analysisMode !== 'comparison' && currentPeriodIndex > -1 && currentPeriodIndex + 1 < periods.length) {
-            neededPeriodIds.add(periods[currentPeriodIndex + 1].id);
+        if (analysisMode !== 'comparison' && currentPeriodIndex > -1) {
+            if (currentPeriodIndex + 1 < periods.length) {
+                neededPeriodIds.add(periods[currentPeriodIndex + 1].id);
+            }
+            if (analysisMode === 'pop' && currentPeriodIndex + 2 < periods.length) {
+                neededPeriodIds.add(periods[currentPeriodIndex + 2].id);
+            }
         }
         
-        // For 'pop', we need the period before the previous one
-        if (analysisMode === 'pop' && currentPeriodIndex > -1 && currentPeriodIndex + 2 < periods.length) {
-            neededPeriodIds.add(periods[currentPeriodIndex + 2].id);
-        }
-        
-        // For 'comparison', we need the selected compare period and its predecessor
         if (analysisMode === 'comparison') {
             neededPeriodIds.add(comparePeriod);
-            const comparePeriodIndex = periods.findIndex(p => p.id === comparePeriod);
-            if (comparePeriodIndex > -1 && comparePeriodIndex + 1 < periods.length) {
-                neededPeriodIds.add(periods[comparePeriodIndex + 1].id);
-            }
         }
         
         const trendRawPromise = getRawDataForTrend(currentPeriod, 15);
 
-        // Fetch all needed periods at once
         const allPeriodData: Record<string, RawBusinessData[]> = {};
         const fetchPromises = Array.from(neededPeriodIds).map(id => 
             getRawDataForPeriod(id).then(data => { allPeriodData[id] = data; })
         );
 
-        await Promise.all([...fetchPromises, trendRawPromise]);
-        
+        await Promise.all(fetchPromises);
         const trendRaw = await trendRawPromise;
 
         const processed = processDashboardData({
