@@ -1,10 +1,11 @@
-import { createRouteHandlerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@/utils/supabase/route'
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: Request) {
+  const supabase = createClient()
   const { email, password } = await req.json()
-  const supabase = createRouteHandlerClient({ cookies })
 
   const { error } = await supabase.auth.signInWithPassword({
     email,
@@ -15,6 +16,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 401 })
   }
 
-  // Cookie is automatically set by the client.
   return NextResponse.json({ message: 'Login successful' }, { status: 200 })
 }

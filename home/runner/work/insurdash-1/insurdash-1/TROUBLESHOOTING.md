@@ -95,7 +95,45 @@ return (
 
 **排查技巧**:
 当遇到此错误时，请全局搜索代码，检查是否存在将组件（特别是来自第三方库的组件，首字母大写的变量）赋值给变量后再进行渲染的地方。将其重构为使用三元运算符（`? :`）或逻辑与（`&&`）直接在 JSX 中进行条件渲染。
-## 4. 线上部署后无法登录 (`TypeError: Failed to fetch`)
+## 4. 自动化部署失败: `Module ... has no exported member 'createRouteHandlerClient'`
+
+**现象**:
+在 `npm run build` 或 GitHub Actions 部署过程中，构建失败并抛出 TypeScript 错误，提示 `@supabase/ssr` 模块没有名为 `createRouteHandlerClient` 的导出成员。
+
+**根本原因分析**:
+这是一个典型的**库版本与API不匹配**的问题。在 `@supabase/ssr` 库的旧版本中，曾使用 `createRouteHandlerClient` 专门为API路由创建客户端。然而，在较新的版本中（如本项目使用的 `^0.4.0`），Supabase 官方对API进行了整合与简化。
+
+现在，`createServerClient` 函数被设计为同时服务于**服务器组件（Server Components）**、**服务器动作（Server Actions）**和**API路由（Route Handlers）**。因此，`createRouteHandlerClient` 函数已被移除或不再导出。
+
+**解决方案与最佳实践**:
+解决方案是，在所有需要于API路由中创建Supabase客户端的地方，统一使用 `createServerClient` 函数。
+
+**错误示例**:
+```typescript
+// 在 /app/api/auth/login/route.ts 中
+import { createRouteHandlerClient } from '@supabase/ssr'; // 错误：此函数不再存在
+const supabase = createRouteHandlerClient({ cookies });
+```
+
+**正确示例**:
+```typescript
+// 在 /utils/supabase/route.ts (辅助函数)
+import { createServerClient } from '@supabase/ssr'; // 正确
+// ...
+return createServerClient(...);
+
+// 在 /app/api/auth/login/route.ts 中
+import { createClient } from '@/utils/supabase/route'; // 正确：使用辅助函数
+const supabase = createClient();
+```
+
+**排查技巧**:
+当遇到此类“模块无导出成员”的错误时，应首先检查：
+1.  **`package.json`**: 确认所使用库（如 `@supabase/ssr`）的版本号。
+2.  **官方文档**: 查阅该库对应版本的官方文档，确认当前的API用法是否正确。库的API会随着版本迭代而变化。
+3.  **项目内一致性**: 检查项目中其他地方（如 `middleware.ts`）是如何创建客户端的，这通常能提供线索。
+
+## 5. 线上部署后无法登录 (`TypeError: Failed to fetch`)
 
 **现象**:
 应用成功部署到 Cloudflare Pages (例如 `https://insurdash.pages.dev`) 后，在登录页面输入用户名和密码，点击登录后无反应或报错。浏览器开发者工具的控制台 (Console) 显示 `TypeError: Failed to fetch` 错误。
