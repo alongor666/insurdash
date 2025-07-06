@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -83,11 +84,11 @@ export default function GlobalFilters({ periods, businessTypes }: GlobalFiltersP
         </div>
         <div className="space-y-1">
           <Label>对比周期</Label>
-          <Select value={comparePeriod} onValueChange={setComparePeriod} disabled={periods.length === 0 || analysisMode === 'pop'}>
+          <Select value={comparePeriod} onValueChange={setComparePeriod} disabled={analysisMode !== 'comparison'}>
             <SelectTrigger><SelectValue placeholder="选择周期" /></SelectTrigger>
             <SelectContent>
               {periods.map(period => (
-                <SelectItem key={period.id} value={period.id}>{period.name}</SelectItem>
+                <SelectItem key={period.id} value={period.id} disabled={period.id === currentPeriod}>{period.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

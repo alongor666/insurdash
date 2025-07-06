@@ -37,7 +37,7 @@
 - **初始化**: 组件首次加载时 (`useEffect` with `user` dependency)，会调用 `getFilterOptions` 获取周期和业务类型列表，并根据URL参数或默认值设置初始筛选状态，将 `isReady` 设为 `true`。
 - **数据获取**: 当筛选条件（如周期、业务线、分析模式等）发生变化时，另一个 `useEffect` hook 会被触发。它会：
   1.  将 `loading` 设为 `true`。
-  2.  根据当前 `analysisMode` 智能地获取所有必需的原始数据（例如，在'pop'模式下，会获取当前周期、上个周期和上上个周期的数据）。
+  2.  智能地获取所有必需的原始数据（例如，在'pop'模式下，会获取当前周期、上个周期和上上个周期的数据）。
   3.  调用 `processDashboardData` 和 `processTrendData` 对原始数据进行计算和处理。
   4.  将处理后的数据更新到state中。
   5.  将 `loading` 设为 `false`。

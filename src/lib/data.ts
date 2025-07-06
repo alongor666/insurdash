@@ -8,7 +8,6 @@ import { KPIS } from "./kpi-config";
 export async function getFilterOptions(): Promise<{ periods: { id: string, name: string }[], businessTypes: string[] }> {
     const supabase = createClient();
     
-    // The query has been updated to use the business_data view which contains all business types per period.
     const { data, error } = await supabase
         .from('business_data')
         .select('period_id, period_label, business_type');
@@ -25,7 +24,6 @@ export async function getFilterOptions(): Promise<{ periods: { id: string, name:
     const periodMap = new Map<string, string>();
     const businessTypeSet = new Set<string>();
 
-    // The data is now a flat list, so we iterate through it to populate periods and business types
     for (const item of data) {
         if (item.period_id && item.period_label) {
             periodMap.set(item.period_id, item.period_label);
@@ -37,7 +35,7 @@ export async function getFilterOptions(): Promise<{ periods: { id: string, name:
 
     const periods = Array.from(periodMap.entries())
         .map(([id, name]) => ({ id, name }))
-        .sort((a, b) => b.id.localeCompare(a.id)); // Sort periods descending
+        .sort((a, b) => b.id.localeCompare(a.id)); 
     
     const businessTypes = Array.from(businessTypeSet).sort();
     
@@ -58,7 +56,6 @@ export async function getRawDataForPeriod(periodId: string): Promise<RawBusiness
         return [];
     }
     
-    // The view returns one row per business_type, which matches the expected RawBusinessData[] structure.
     return (data as RawBusinessData[]) || [];
 }
 
@@ -70,7 +67,6 @@ export async function getRawDataForTrend(
     const supabase = createClient();
     if (!endPeriodId) return [];
 
-    // Get all unique, sorted period IDs first
     const { data: allPeriods, error: allPeriodsError } = await supabase
         .from('business_data')
         .select('period_id')
@@ -84,12 +80,10 @@ export async function getRawDataForTrend(
     const startIndex = sortedPeriodIds.indexOf(endPeriodId);
     if(startIndex === -1) return [];
 
-    // We need one extra period to calculate the PoP for the last data point
     const trendPeriodIds = sortedPeriodIds.slice(startIndex, startIndex + count + 1);
 
     if (trendPeriodIds.length === 0) return [];
 
-    // Fetch all data for the required periods in one go
     const { data: trendData, error: trendError } = await supabase
         .from('business_data')
         .select('*')
@@ -109,12 +103,11 @@ export async function getRawDataForTrend(
     }, {} as Record<string, RawBusinessData[]>);
     
     const result = [];
-    // Iterate for 'count' periods to create pairs of (current, previous)
     for(let i = 0; i < count; i++) {
         const currentPeriodId = sortedPeriodIds[startIndex + i];
-        const previousPeriodId = sortedPeriodIds[startIndex + i + 1]; // The next oldest period
+        const previousPeriodId = sortedPeriodIds[startIndex + i + 1];
 
-        if(!currentPeriodId || !previousPeriodId) break; // Stop if we run out of periods
+        if(!currentPeriodId || !previousPeriodId) break;
 
         const current = dataByPeriod[currentPeriodId] || [];
         const previous = dataByPeriod[previousPeriodId] || [];
@@ -122,14 +115,13 @@ export async function getRawDataForTrend(
         if (current.length > 0) {
              result.push({
                 period_id: currentPeriodId,
-                period_label: current[0].period_label, // Get label from the first record
+                period_label: current[0].period_label,
                 current,
                 previous
              })
         }
     }
     
-    // The result is naturally from most recent to least recent, so we reverse it for the chart
     return result.reverse();
 }
 // #endregion
@@ -156,7 +148,6 @@ export function calculateKpis(rawData: RawBusinessData): ProcessedBusinessData['
     kpis.total_loss_amount = total_loss_amount;
     kpis.claim_count = claim_count;
     
-    // For aggregated data, this will be a weighted average. For single lines, it's from raw data.
     kpis.avg_premium_per_policy = avg_premium_per_policy;
     
     kpis.policy_count = safeDivide(premium_written * 10000, kpis.avg_premium_per_policy);
@@ -179,10 +170,8 @@ export function calculateKpis(rawData: RawBusinessData): ProcessedBusinessData['
     
     kpis.marginal_contribution_amount = premium_earned * (kpis.marginal_contribution_ratio / 100);
     
-    // These need total premium to be calculated, will be done in the processing step
     kpis.premium_share = 0; 
     
-    // This is only available for single, non-aggregated business lines
     kpis.avg_commercial_index = rawData.avg_commercial_index || 0;
 
     return kpis;
@@ -191,7 +180,6 @@ export function calculateKpis(rawData: RawBusinessData): ProcessedBusinessData['
 
 function aggregateRawData(data: RawBusinessData[]): RawBusinessData {
     if (data.length === 0) {
-        // Return a zeroed-out RawBusinessData object
         return {
             period_id: '',
             period_label: '',
@@ -225,11 +213,9 @@ function aggregateRawData(data: RawBusinessData[]): RawBusinessData {
         aggregated.expense_amount_raw += item.expense_amount_raw || 0;
         aggregated.claim_count += item.claim_count || 0;
 
-        // For weighted average of avg_premium_per_policy
         totalPremiumForAvg += (item.avg_premium_per_policy || 0) * (item.premium_written || 0);
     }
 
-    // Calculate weighted average for avg_premium_per_policy
     aggregated.avg_premium_per_policy = safeDivide(totalPremiumForAvg, aggregated.premium_written);
     
     return {
@@ -239,7 +225,6 @@ function aggregateRawData(data: RawBusinessData[]): RawBusinessData {
         business_type: 'Aggregated',
         comparison_period_id_mom: data[0]?.comparison_period_id_mom || '',
         totals_for_period: data[0]?.totals_for_period || { total_premium_written_overall: 0 },
-        // avg_commercial_index is not meaningful when aggregated, except for single business type selection
         avg_commercial_index: data.length === 1 ? data[0].avg_commercial_index : 0,
     };
 }
@@ -264,7 +249,6 @@ function calculatePeriodOverPeriod(current: RawBusinessData[], previous: RawBusi
             total_loss_amount: (currentItem.total_loss_amount || 0) - (previousItem.total_loss_amount || 0),
             expense_amount_raw: (currentItem.expense_amount_raw || 0) - (previousItem.expense_amount_raw || 0),
             claim_count: (currentItem.claim_count || 0) - (previousItem.claim_count || 0),
-            // For PoP, these are non-additive and should be taken from the current period directly
             avg_premium_per_policy: currentItem.avg_premium_per_policy,
             avg_commercial_index: currentItem.avg_commercial_index
         };
@@ -276,7 +260,7 @@ interface ProcessDataParams {
     currentPeriodRawData: RawBusinessData[];
     comparePeriodRawData: RawBusinessData[];
     prevCurrentPeriodRawData: RawBusinessData[];
-    prevComparePeriodRawData: RawBusinessData[];
+    prev2PeriodRawData: RawBusinessData[];
     selectedBusinessTypes: string[];
     analysisMode: AnalysisMode;
 }
@@ -285,61 +269,53 @@ export function processDashboardData({
     currentPeriodRawData,
     comparePeriodRawData,
     prevCurrentPeriodRawData,
-    prevComparePeriodRawData,
+    prev2PeriodRawData,
     selectedBusinessTypes,
     analysisMode,
-}: ProcessDataParams): DashboardData {
+}: ProcessDataParams): DashboardData | null {
+
     const currentFiltered = currentPeriodRawData.filter(d => selectedBusinessTypes.includes(d.business_type));
     const compareFiltered = comparePeriodRawData.filter(d => selectedBusinessTypes.includes(d.business_type));
     const prevCurrentFiltered = prevCurrentPeriodRawData.filter(d => selectedBusinessTypes.includes(d.business_type));
-    const prevCompareFiltered = prevComparePeriodRawData.filter(d => selectedBusinessTypes.includes(d.business_type));
+    const prev2Filtered = prev2PeriodRawData.filter(d => selectedBusinessTypes.includes(d.business_type));
 
-    let dataForCurrentKpis: RawBusinessData[];
-    let dataForCompareKpis: RawBusinessData[];
-    let dataForChartsAndTable: RawBusinessData[];
+    let mainData: RawBusinessData[];
+    let compareDataForKpi: RawBusinessData[];
 
-    if (analysisMode === 'ytd') {
-        dataForCurrentKpis = currentFiltered;
-        dataForCompareKpis = compareFiltered;
-        dataForChartsAndTable = currentFiltered;
-    } else { // 'pop' or 'comparison' use PoP data
-        const currentPop = calculatePeriodOverPeriod(currentFiltered, prevCurrentFiltered);
-        dataForCurrentKpis = currentPop;
-        dataForChartsAndTable = currentPop;
-        
-        if (analysisMode === 'pop') {
-            dataForCompareKpis = calculatePeriodOverPeriod(prevCurrentFiltered, prevCompareFiltered);
-        } else { // 'comparison'
-            dataForCompareKpis = calculatePeriodOverPeriod(compareFiltered, prevCompareFiltered);
-        }
+    if (analysisMode === 'pop') {
+        mainData = calculatePeriodOverPeriod(currentFiltered, prevCurrentFiltered);
+        compareDataForKpi = calculatePeriodOverPeriod(prevCurrentFiltered, prev2Filtered);
+    } else if (analysisMode === 'ytd') {
+        mainData = currentFiltered;
+        compareDataForKpi = prevCurrentFiltered;
+    } else { // 'comparison'
+        mainData = currentFiltered;
+        compareDataForKpi = compareFiltered;
     }
     
-    const totalPremiumOverall = currentPeriodRawData.reduce((sum, item) => sum + (item.premium_written || 0), 0);
+    const totalPremiumOverallCurrent = currentPeriodRawData.reduce((sum, item) => sum + (item.premium_written || 0), 0);
 
-    const byBusinessType = dataForChartsAndTable.map(businessLineData => {
+    const byBusinessType = mainData.map(businessLineData => {
         const kpis = calculateKpis(businessLineData);
-        const totalPremiumForShare = analysisMode === 'ytd' ? totalPremiumOverall : currentFiltered.reduce((sum, item) => sum + (item.premium_written || 0), 0);
+        const totalPremiumForShare = analysisMode === 'ytd' || analysisMode === 'comparison'
+            ? totalPremiumOverallCurrent
+            : currentFiltered.reduce((sum, item) => sum + (item.premium_written || 0), 0);
+            
         kpis.premium_share = safeDivide(businessLineData.premium_written, totalPremiumForShare) * 100;
-
-        if (selectedBusinessTypes.length !== 1 || analysisMode !== 'ytd') {
+        
+        if (selectedBusinessTypes.length !== 1 || analysisMode === 'pop') {
             kpis.avg_commercial_index = 0;
         }
         return { ...businessLineData, kpis };
     });
-
-    const aggregateCurrent = aggregateRawData(dataForCurrentKpis);
-    const aggregateCompare = aggregateRawData(dataForCompareKpis);
+    
+    const aggregateCurrent = aggregateRawData(mainData);
+    const aggregateCompare = aggregateRawData(compareDataForKpi);
 
     const summaryCurrentKpis = calculateKpis(aggregateCurrent);
     const summaryCompareKpis = calculateKpis(aggregateCompare);
-    
-    const totalCurrentForShare = analysisMode === 'ytd' ? totalPremiumOverall : currentFiltered.reduce((sum, item) => sum + (item.premium_written || 0), 0);
-    summaryCurrentKpis.premium_share = safeDivide(summaryCurrentKpis.premium_written, totalCurrentForShare) * 100;
-    
-    const totalCompareForShare = analysisMode === 'ytd' ? (comparePeriodRawData.reduce((sum, item) => sum + (item.premium_written || 0), 0)) : (prevCurrentFiltered.reduce((sum, item) => sum + (item.premium_written || 0), 0));
-    summaryCompareKpis.premium_share = safeDivide(summaryCompareKpis.premium_written, totalCompareForShare) * 100;
-    
-    if (selectedBusinessTypes.length !== 1 || analysisMode !== 'ytd') {
+
+    if (selectedBusinessTypes.length !== 1 || analysisMode === 'pop') {
         summaryCurrentKpis.avg_commercial_index = 0;
         summaryCompareKpis.avg_commercial_index = 0;
     }
@@ -361,12 +337,10 @@ export function processTrendData(
     if (!trendRaw || trendRaw.length === 0) return [];
     
     return trendRaw.map(periodData => {
-        // For YTD KPIs for the trend
         const ytdData = periodData.current.filter(d => selectedBusinessTypes.includes(d.business_type));
         const ytdAgg = aggregateRawData(ytdData);
         const ytdKpis = calculateKpis(ytdAgg);
 
-        // For PoP KPIs for the trend
         const popData = calculatePeriodOverPeriod(
             periodData.current.filter(d => selectedBusinessTypes.includes(d.business_type)),
             periodData.previous.filter(d => selectedBusinessTypes.includes(d.business_type))
@@ -380,7 +354,7 @@ export function processTrendData(
             ytd_kpis: ytdKpis,
             pop_kpis: popKpis,
         };
-    }).filter(p => p.ytd_kpis.policy_count > 0 || p.pop_kpis.policy_count !== 0); // Keep data points even if YTD is empty but PoP is not
+    }).filter(p => p.ytd_kpis.policy_count > 0 || p.pop_kpis.policy_count !== 0);
 }
 // #endregion
 
@@ -411,7 +385,7 @@ export function formatKpiValue(value: number, unit: '万元' | '%' | '件' | '' 
             return `${value.toFixed(1)}${unit}`;
 
         case '': // For avg_commercial_index, which is a coefficient
-            return value.toFixed(4); // Keep precision
+            return value.toFixed(4);
 
         default:
             return value.toLocaleString();
@@ -422,7 +396,8 @@ export function formatKpiValue(value: number, unit: '万元' | '%' | '件' | '' 
 export function getComparisonMetrics(kpiId: KpiKey, currentValue: number, previousValue: number) {
     const { positiveChangeIs, unit } = KPIS[kpiId];
     
-    const isNew = previousValue === 0 && currentValue !== 0 && previousValue !== currentValue;
+    const isNew = (previousValue === 0 || previousValue === null || previousValue === undefined) && (currentValue !== 0 && currentValue !== null && currentValue !== undefined) && previousValue !== currentValue;
+
     if (previousValue === null || previousValue === undefined || !isFinite(previousValue) || previousValue === 0) {
         return { diff: currentValue, percentageChange: Infinity, isBetter: positiveChangeIs === 'up', isZero: currentValue === 0, isNew, unit };
     }

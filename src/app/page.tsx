@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -66,12 +67,16 @@ export default function DashboardPage() {
   
   useEffect(() => {
     if (user) {
-      setLoading(true);
       getFilterOptions().then(({ periods, businessTypes }) => {
-        const currentPeriod = searchParams.get('cp') || (periods[0]?.id ?? '');
-        const comparePeriod = searchParams.get('pp') || (periods[1]?.id ?? '');
-        const analysisMode = (searchParams.get('mode') as AnalysisMode) || 'ytd';
-        const selectedBusinessTypes = searchParams.get('bl')?.split(',') || businessTypes;
+        const urlCp = searchParams.get('cp');
+        const urlPp = searchParams.get('pp');
+        const urlMode = searchParams.get('mode') as AnalysisMode | null;
+        const urlBl = searchParams.get('bl');
+
+        const currentPeriod = urlCp || (periods[0]?.id ?? '');
+        const comparePeriod = urlPp || (periods[1]?.id ?? '');
+        const analysisMode = urlMode || 'ytd';
+        const selectedBusinessTypes = urlBl ? urlBl.split(',') : businessTypes;
         
         setState(s => ({ ...s, periods, businessTypes, currentPeriod, comparePeriod, analysisMode, selectedBusinessTypes }));
         setIsReady(true);
@@ -81,17 +86,21 @@ export default function DashboardPage() {
 
   const updateURL = useCallback(() => {
     if (!isReady) return;
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams();
     params.set('cp', state.currentPeriod);
-    if(state.analysisMode !== 'pop') {
-      params.set('pp', state.comparePeriod);
-    } else {
-      params.delete('pp');
-    }
     params.set('mode', state.analysisMode);
-    params.set('bl', state.selectedBusinessTypes.join(','));
+    
+    if (state.analysisMode === 'comparison') {
+        params.set('pp', state.comparePeriod);
+    }
+    
+    if (state.selectedBusinessTypes.length !== state.businessTypes.length) {
+      params.set('bl', state.selectedBusinessTypes.join(','));
+    }
+
     router.replace(`?${params.toString()}`, { scroll: false });
-  }, [isReady, state.currentPeriod, state.comparePeriod, state.analysisMode, state.selectedBusinessTypes, router, searchParams]);
+  }, [isReady, state.currentPeriod, state.comparePeriod, state.analysisMode, state.selectedBusinessTypes, state.businessTypes, router]);
+
 
   useEffect(() => {
     updateURL();
@@ -103,38 +112,32 @@ export default function DashboardPage() {
     setLoading(true);
     const fetchData = async () => {
       try {
-        const { currentPeriod, comparePeriod, analysisMode, selectedBusinessTypes } = state;
-  
-        const trendRawPromise = getRawDataForTrend(currentPeriod, 15);
-        const currentRawPromise = getRawDataForPeriod(currentPeriod);
+        const { currentPeriod, comparePeriod, analysisMode, selectedBusinessTypes, periods } = state;
+
+        const currentPeriodIndex = periods.findIndex(p => p.id === currentPeriod);
         
-        const [trendRaw, currentRaw] = await Promise.all([trendRawPromise, currentRawPromise]);
-  
-        const currentPrevId = currentRaw[0]?.comparison_period_id_mom;
-        const currentPrevRaw = currentPrevId ? await getRawDataForPeriod(currentPrevId) : [];
-  
-        let compareRaw: RawBusinessData[] = [];
-        let comparePrevRaw: RawBusinessData[] = [];
-  
-        if (analysisMode === 'ytd') {
-            if(comparePeriod) compareRaw = await getRawDataForPeriod(comparePeriod);
-        } else if (analysisMode === 'comparison') {
-            if(comparePeriod) {
-                compareRaw = await getRawDataForPeriod(comparePeriod);
-                const comparePrevId = compareRaw[0]?.comparison_period_id_mom;
-                comparePrevRaw = comparePrevId ? await getRawDataForPeriod(comparePrevId) : [];
-            }
-        } else if (analysisMode === 'pop') {
-            compareRaw = currentPrevRaw;
-            const comparePrevId = compareRaw[0]?.comparison_period_id_mom;
-            comparePrevRaw = comparePrevId ? await getRawDataForPeriod(comparePrevId) : [];
-        }
-  
+        const prevPeriodId = (currentPeriodIndex > -1 && currentPeriodIndex + 1 < periods.length) ? periods[currentPeriodIndex + 1].id : undefined;
+        const prev2PeriodId = (currentPeriodIndex > -1 && currentPeriodIndex + 2 < periods.length) ? periods[currentPeriodIndex + 2].id : undefined;
+
+        const [
+            currentRaw,
+            prevCurrentRaw,
+            prev2CurrentRaw,
+            compareRaw,
+            trendRaw,
+        ] = await Promise.all([
+            getRawDataForPeriod(currentPeriod),
+            prevPeriodId ? getRawDataForPeriod(prevPeriodId) : Promise.resolve([]),
+            prev2PeriodId ? getRawDataForPeriod(prev2PeriodId) : Promise.resolve([]),
+            analysisMode === 'comparison' ? getRawDataForPeriod(comparePeriod) : Promise.resolve([]),
+            getRawDataForTrend(currentPeriod, 15)
+        ]);
+
         const processed = processDashboardData({
             currentPeriodRawData: currentRaw,
             comparePeriodRawData: compareRaw,
-            prevCurrentPeriodRawData: currentPrevRaw,
-            prevComparePeriodRawData: comparePrevRaw,
+            prevCurrentPeriodRawData: prevCurrentRaw,
+            prev2PeriodRawData: prev2CurrentRaw,
             selectedBusinessTypes,
             analysisMode
         });
@@ -151,7 +154,7 @@ export default function DashboardPage() {
     };
   
     fetchData();
-  }, [isReady, state.currentPeriod, state.comparePeriod, state.selectedBusinessTypes, state.analysisMode]);
+  }, [isReady, state.currentPeriod, state.comparePeriod, state.selectedBusinessTypes, state.analysisMode, state.periods]);
   
   const actions = {
     setPeriod: (periodId: string) => setState(s => ({ ...s, currentPeriod: periodId })),
