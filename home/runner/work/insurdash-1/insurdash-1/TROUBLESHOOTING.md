@@ -95,43 +95,31 @@ return (
 
 **排查技巧**:
 当遇到此错误时，请全局搜索代码，检查是否存在将组件（特别是来自第三方库的组件，首字母大写的变量）赋值给变量后再进行渲染的地方。将其重构为使用三元运算符（`? :`）或逻辑与（`&&`）直接在 JSX 中进行条件渲染。
-## 4. 自动化部署失败: `Module ... has no exported member 'createRouteHandlerClient'`
+## 4. 自动化部署失败: `Cannot find module '@/...' or its corresponding type declarations`
 
 **现象**:
-在 `npm run build` 或 GitHub Actions 部署过程中，构建失败并抛出 TypeScript 错误，提示 `@supabase/ssr` 模块没有名为 `createRouteHandlerClient` 的导出成员。
+在 `npm run build` 或 GitHub Actions 部署过程中，构建失败并抛出 TypeScript 错误，提示某个使用路径别名（例如 `@/lib/supabase/route`）导入的模块无法被找到。
 
 **根本原因分析**:
-这是一个典型的**库版本与API不匹配**的问题。在 `@supabase/ssr` 库的旧版本中，曾使用 `createRouteHandlerClient` 专门为API路由创建客户端。然而，在较新的版本中（如本项目使用的 `^0.4.0`），Supabase 官方对API进行了整合与简化。
-
-现在，`createServerClient` 函数被设计为同时服务于**服务器组件（Server Components）**、**服务器动作（Server Actions）**和**API路由（Route Handlers）**。因此，`createRouteHandlerClient` 函数已被移除或不再导出。
+这是一个在生产构建环境中可能出现的、微妙的**路径别名解析问题**。尽管 `tsconfig.json` 中的 `@/` 别名配置是正确的，并且在本地开发服务器上一切正常，但在 Next.js 的生产构建流程中，某些因素（如与其他工具配置的交互、构建环境的差异等）有时会干扰别名解析器的正常工作。
 
 **解决方案与最佳实践**:
-解决方案是，在所有需要于API路由中创建Supabase客户端的地方，统一使用 `createServerClient` 函数。
+解决此问题的最直接、最可靠的方法是**放弃使用路径别名，转而使用明确的相对路径**来导入模块。这会完全绕过可能出问题的别名解析系统，为构建工具提供一个无歧义的文件位置。
 
 **错误示例**:
 ```typescript
-// 在 /app/api/auth/login/route.ts 中
-import { createRouteHandlerClient } from '@supabase/ssr'; // 错误：此函数不再存在
-const supabase = createRouteHandlerClient({ cookies });
+// 在 /app/api/auth/login/route.ts 中，可能会构建失败
+import { createClient } from '@/lib/supabase/route'; 
 ```
 
 **正确示例**:
 ```typescript
-// 在 /utils/supabase/route.ts (辅助函数)
-import { createServerClient } from '@supabase/ssr'; // 正确
-// ...
-return createServerClient(...);
-
-// 在 /app/api/auth/login/route.ts 中
-import { createClient } from '@/utils/supabase/route'; // 正确：使用辅助函数
-const supabase = createClient();
+// 在 /app/api/auth/login/route.ts 中，使用相对路径
+import { createClient } from '../../../../lib/supabase/route';
 ```
 
 **排查技巧**:
-当遇到此类“模块无导出成员”的错误时，应首先检查：
-1.  **`package.json`**: 确认所使用库（如 `@supabase/ssr`）的版本号。
-2.  **官方文档**: 查阅该库对应版本的官方文档，确认当前的API用法是否正确。库的API会随着版本迭代而变化。
-3.  **项目内一致性**: 检查项目中其他地方（如 `middleware.ts`）是如何创建客户端的，这通常能提供线索。
+当您在生产构建中遇到 `Cannot find module` 错误，但确认文件存在且本地开发正常时，应优先尝试将别名路径（`@/...`）修改为相对路径（`../...`）作为首要排查手段。
 
 ## 5. 线上部署后无法登录 (`TypeError: Failed to fetch`)
 
