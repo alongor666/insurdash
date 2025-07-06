@@ -10,12 +10,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
     }
 
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+        console.error('SERVER_ERROR: Supabase URL or Key not configured in production environment variables.');
+        return NextResponse.json({ error: '服务器配置错误。请联系管理员。' }, { status: 500 });
+    }
+
     // This route runs on the server, using environment variables set in Cloudflare.
     // This is secure and does not expose keys to the browser.
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Securely authenticate against Supabase from the server-side.
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -35,7 +40,8 @@ export async function POST(request: Request) {
     // On success, securely return the session data to the client.
     return NextResponse.json({ session: data.session });
 
-  } catch (e) {
+  } catch (e: any) {
+    console.error('UNEXPECTED_SERVER_ERROR:', e.message);
     return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 });
   }
 }
