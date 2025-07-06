@@ -1,6 +1,6 @@
 'use client';
 import { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';

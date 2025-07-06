@@ -1,4 +1,8 @@
-// This file is deprecated and has been replaced by the modular Supabase clients
-// located in /src/utils/supabase/.
-// This file can be safely deleted.
-export {};
+
+import { createBrowserClient } from '@supabase/ssr';
+
+export const createClient = () =>
+  createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
