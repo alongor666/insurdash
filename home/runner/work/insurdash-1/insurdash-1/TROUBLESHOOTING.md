@@ -95,41 +95,26 @@ return (
 
 **排查技巧**:
 当遇到此错误时，请全局搜索代码，检查是否存在将组件（特别是来自第三方库的组件，首字母大写的变量）赋值给变量后再进行渲染的地方。将其重构为使用三元运算符（`? :`）或逻辑与（`&&`）直接在 JSX 中进行条件渲染。
-## 4. 自动化部署失败：`'supabase' is possibly 'null'`
-
-**现象**:
-在 `npm run build` 或 GitHub Actions 部署过程中，构建失败并抛出 TypeScript 错误 `Type error: 'supabase' is possibly 'null'`。
-
-**根本原因分析**:
-这个问题的根源在于 Supabase 客户端的**条件初始化**。在旧的实现中（使用`@supabase/supabase-js`），只有当环境变量存在时，`supabase` 对象才会被创建。否则，它将保持为 `null`。
-
-虽然应用的其他部分尝试通过 `const isSupabaseConfigured = !!supabase;` 来检查配置状态，但 TypeScript 的静态类型分析器无法将此间接检查关联到 `supabase` 对象不再是 `null` 的事实，从而抛出类型错误。
-
-**解决方案与最佳实践**:
-此问题已通过**升级到 `@supabase/ssr` 库**得到根本解决。新的 `createClient()` 函数模式确保了即使环境变量缺失，也会返回一个符合类型定义的对象（尽管它会抛出运行时错误），从而避免了编译时类型错误。
-
-如果您在其他地方遇到类似问题，请遵循以下原则：
-
-*   **避免间接检查**: 不要依赖派生出的布尔值（如 `isSupabaseConfigured`）来做类型守卫。
-*   **使用直接的 `null` 检查**: 在任何要使用可为 `null` 的对象的作用域内，首先进行一次 `if (!myObject) return;` 或 `if (!myObject) throw new Error(...)` 的检查。这会明确地告诉 TypeScript，在该检查点之后，`myObject` 的类型已被收窄，不再是 `null`。
-
-## 5. 【已解决】线上部署后无法登录 (`TypeError: Failed to fetch`)
-
-> **[!] 历史问题归档**
->
-> 这个问题之前是由于**跨域资源共享 (CORS)** 导致的。现在，我们已经通过**架构升级**彻底解决了这个问题，**不再需要配置CORS白名单**。本章节作为历史记录保留，新的解决方案请参考下文。
-
----
+## 4. 线上部署后无法登录 (`TypeError: Failed to fetch`)
 
 **现象**:
 应用成功部署到 Cloudflare Pages (例如 `https://insurdash.pages.dev`) 后，在登录页面输入用户名和密码，点击登录后无反应或报错。浏览器开发者工具的控制台 (Console) 显示 `TypeError: Failed to fetch` 错误。
 
-**根本原因分析 (新架构)**:
-在新的动态部署架构下，登录请求会首先发送到我们自己的后端API路由 (`/api/auth/login`)。这个API路由需要 Supabase 的 URL 和 anon key 才能工作。如果 Cloudflare Pages 的生产环境中没有配置这些环境变量，API 路由就会失败，从而导致前端收到 `Failed to fetch` 或类似的服务器错误。
+**根本原因分析**:
+这个问题的根本原因 **100%** 是您部署在 Cloudflare Pages 上的**生产环境缺少必要的环境变量**。
 
-**核心解决方案：在 Cloudflare Pages 中配置生产环境变量**
+本应用采用的 **BFF (后端代理) 架构**意味着：
+1.  您的浏览器（客户端）并**不直接**与 Supabase 通信进行登录。
+2.  相反，它会向我们自己的应用后端 `/api/auth/login` 发送一个请求。
+3.  这个后端API路由在 Cloudflare 的服务器上运行，它**代表**您去和 Supabase 进行安全的服务器间认证。
 
-您 **必须** 亲自登录到您的 Cloudflare 项目后台，手动为生产环境添加必要的 Supabase 环境变量。这是唯一、正确的解决方案。
+为了完成这一步，这个后端API路由**必须**能访问到您的 Supabase 项目 URL 和 anon Key。在本地开发时，它能从 `.env.local` 文件中读取；但在生产环境，它**只能**从您在 Cloudflare Pages 项目设置中配置的环境变量中读取。
+
+如果缺少这些环境变量，API路由就会失败，从而导致前端收到 `Failed to fetch` 错误。
+
+> **[!] 核心解决方案：此问题无法通过修改代码解决**
+>
+> 您 **必须** 亲自登录到您的 Cloudflare 项目后台，手动为生产环境添加必要的 Supabase 环境变量。这是唯一、正确的解决方案。
 
 **解决方案 (Cloudflare后台配置)**:
 您必须在 Cloudflare 仪表盘中，将您的 Supabase 配置作为环境变量添加进去。
@@ -147,4 +132,4 @@ return (
         *   **Value**: 粘贴您从 Supabase 项目设置中复制的 anon **public key**。
 6.  点击 **Save** 保存。
 
-保存后，等待约一分钟让配置生效，然后刷新您的线上应用页面，登录功能即可正常使用。
+保存后，Cloudflare 会自动为您触发一次新的部署。等待部署完成后，刷新您的线上应用页面，登录功能即可正常使用。
