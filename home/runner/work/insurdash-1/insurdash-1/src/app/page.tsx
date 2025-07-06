@@ -14,11 +14,12 @@ import ChartsSection from '@/components/dashboard/charts-section';
 import DataTable from '@/components/dashboard/data-table';
 import { getFilterOptions, getRawDataForPeriod, getRawDataForTrend, processDashboardData, processTrendData } from '@/lib/data';
 import type { DashboardState, AnalysisMode, RawBusinessData } from '@/lib/types';
+import { useToast } from "@/hooks/use-toast";
 
 function DashboardContent() {
-  const { state, loading, isReady } = useDashboard();
+  const { state, isReady } = useDashboard();
 
-  if (!isReady) { // Loader for initial setup (fetching periods, etc.)
+  if (!isReady) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -34,13 +35,7 @@ function DashboardContent() {
   } = state;
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col bg-background">
-      {/* Loading overlay for subsequent data fetches to avoid unmounting children */}
-      {loading && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        </div>
-      )}
+    <div className="flex min-h-screen w-full flex-col bg-background">
       <Header />
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <GlobalFilters periods={periods} businessTypes={businessTypes} />
@@ -52,8 +47,7 @@ function DashboardContent() {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground p-8">
-            {/* Show message only if not loading, otherwise the overlay is shown */}
-            {!loading && <p>没有可用于当前筛选的数据。</p>}
+            <p>没有可用于当前筛选的数据。</p>
           </div>
         )}
       </main>
@@ -65,6 +59,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
 
   const [state, setState] = useState<DashboardState>({
     periods: [],
@@ -77,7 +72,6 @@ export default function DashboardPage() {
     trendData: [],
   });
   
-  const [loading, setLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   
   useEffect(() => {
@@ -126,61 +120,53 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!isReady || !state.currentPeriod) return;
   
-    setLoading(true);
     const fetchData = async () => {
       try {
         const { currentPeriod, comparePeriod, analysisMode, selectedBusinessTypes, periods } = state;
 
-        const neededPeriodIds = new Set<string>();
-        neededPeriodIds.add(currentPeriod);
-        
         const currentPeriodIndex = periods.findIndex(p => p.id === currentPeriod);
-
-        if (analysisMode !== 'comparison' && currentPeriodIndex > -1) {
-            if (currentPeriodIndex + 1 < periods.length) {
-                neededPeriodIds.add(periods[currentPeriodIndex + 1].id);
-            }
-            if (analysisMode === 'pop' && currentPeriodIndex + 2 < periods.length) {
-                neededPeriodIds.add(periods[currentPeriodIndex + 2].id);
-            }
-        }
         
-        if (analysisMode === 'comparison') {
-            neededPeriodIds.add(comparePeriod);
-        }
-        
-        const trendRawPromise = getRawDataForTrend(currentPeriod, 15);
+        const prevPeriodId = (currentPeriodIndex > -1 && currentPeriodIndex + 1 < periods.length) ? periods[currentPeriodIndex + 1].id : undefined;
+        const prev2PeriodId = (currentPeriodIndex > -1 && currentPeriodIndex + 2 < periods.length) ? periods[currentPeriodIndex + 2].id : undefined;
 
-        const allPeriodData: Record<string, RawBusinessData[]> = {};
-        const fetchPromises = Array.from(neededPeriodIds).map(id => 
-            getRawDataForPeriod(id).then(data => { allPeriodData[id] = data; })
-        );
-
-        await Promise.all(fetchPromises);
-        const trendRaw = await trendRawPromise;
+        const [
+            currentRaw,
+            prevCurrentRaw,
+            prev2CurrentRaw,
+            compareRaw,
+            trendRaw,
+        ] = await Promise.all([
+            getRawDataForPeriod(currentPeriod),
+            prevPeriodId ? getRawDataForPeriod(prevPeriodId) : Promise.resolve([]),
+            prev2PeriodId ? getRawDataForPeriod(prev2PeriodId) : Promise.resolve([]),
+            analysisMode === 'comparison' ? getRawDataForPeriod(comparePeriod) : Promise.resolve([]),
+            getRawDataForTrend(currentPeriod, 15)
+        ]);
 
         const processed = processDashboardData({
-            allPeriodData,
-            currentPeriodId: currentPeriod,
-            comparePeriodId: comparePeriod,
-            analysisMode,
+            currentPeriodRawData: currentRaw,
+            comparePeriodRawData: compareRaw,
+            prevCurrentPeriodRawData: prevCurrentRaw,
+            prev2PeriodRawData: prev2CurrentRaw,
             selectedBusinessTypes,
-            periods
+            analysisMode
         });
-
+        
         const processedTrendData = processTrendData(trendRaw, selectedBusinessTypes);
   
         setState(s => ({ ...s, processedData: processed, trendData: processedTrendData }));
       } catch (error) {
         console.error("Failed to fetch or process dashboard data:", error);
-        setState(s => ({ ...s, processedData: null, trendData: [] }));
-      } finally {
-        setLoading(false);
+        toast({
+            title: "数据加载失败",
+            description: "无法加载新数据，请检查您的网络连接或稍后再试。",
+            variant: "destructive",
+        });
       }
     };
   
     fetchData();
-  }, [isReady, state.currentPeriod, state.comparePeriod, state.selectedBusinessTypes, state.analysisMode, state.periods]);
+  }, [isReady, state.currentPeriod, state.comparePeriod, state.selectedBusinessTypes, state.analysisMode, state.periods, toast]);
   
   const actions = {
     setPeriod: (periodId: string) => setState(s => ({ ...s, currentPeriod: periodId })),
@@ -190,7 +176,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <DashboardContext.Provider value={{ state, actions, loading, isReady }}>
+    <DashboardContext.Provider value={{ state, actions, loading: false, isReady }}>
       <DashboardContent />
     </DashboardContext.Provider>
   );
