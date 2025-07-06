@@ -47,13 +47,13 @@ graph TD
     User -- "1. 访问应用" --> Pages
     User -- "2. 登录请求" --> ApiRoute
     ApiRoute -- "3. 服务器间安全认证" --> Supabase
-    ApiRoute -- "4. 返回安全凭证" --> User
-    User -- "5. 凭证直接查询数据" --> Supabase
+    ApiRoute -- "4. 返回成功响应 (自动设置Cookie)" --> User
+    User -- "5. 携带Cookie凭证查询数据" --> Supabase
 
     style ApiRoute fill:#F38020,stroke:#fff,stroke-width:2px,color:#fff
 ```
 **流程解读**:
-用户的登录请求不会直接发送到Supabase。它会先到达我们应用自己的API路由。这个路由在安全的服务器环境中运行，它代表用户向Supabase发起认证，然后将获取到的安全凭证(Session)返回给浏览器。这确保了敏感的认证过程永远不会暴露在前端。
+用户的登录请求不会直接发送到Supabase。它会先到达我们应用自己的API路由。这个路由在安全的服务器环境中运行，它代表用户向Supabase发起认证。认证成功后，`@supabase/ssr`库会自动将安全的、`httpOnly`的会话Cookie设置到给浏览器的响应中。这确保了敏感的认证过程永远不会暴露在前端。
 
 ### 5.3. 核心数据模型
 - **数据源**: Supabase Postgres `business_data` 视图。

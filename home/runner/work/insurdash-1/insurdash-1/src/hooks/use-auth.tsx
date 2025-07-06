@@ -1,4 +1,3 @@
-
 'use client';
 import { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
@@ -9,7 +8,7 @@ import { Loader2 } from 'lucide-react';
 // Memoize the client creation to avoid re-creating it on every render.
 const getSupabaseClient = () => createClient();
 
-const AuthContext = createContext<{ user: User | null, loading: boolean }>({ user: null, loading: true });
+const AuthContext = createContext<{ user: User | null, loading: boolean, logout: () => void }>({ user: null, loading: true, logout: () => {} });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(getSupabaseClient, []);
@@ -58,8 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const logout = async () => {
+      await supabase.auth.signOut();
+      router.push('/login');
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, logout }}>
         {children}
     </AuthContext.Provider>
   );
