@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from 'react';
@@ -28,8 +27,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         if (!mainKpi) return null;
 
         const mainValue = dataPoint[kpiSet][kpiKey];
-        const vcr = dataPoint.ytd_kpis.variable_cost_ratio;
-        const contribution = dataPoint.ytd_kpis.marginal_contribution_amount;
+        const vcr = dataPoint[kpiSet].variable_cost_ratio;
+        const contribution = dataPoint[kpiSet].marginal_contribution_amount;
 
         return (
             <div className="rounded-lg border bg-background p-2 shadow-sm">
@@ -40,13 +39,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                         <p className="text-xs font-medium">{formatKpiValue(mainValue, mainKpi.unit)}</p>
                     </div>
                     <div className="flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">{KPIS['variable_cost_ratio'].name}</p>
+                        <p className="text-xs text-muted-foreground">{KPIS['variable_cost_ratio'].name} ({state.analysisMode === 'pop' ? '当周' : '累计'})</p>
                         <p className="text-xs font-medium" style={{color: getDynamicColorByVCR(vcr)}}>
                             {formatKpiValue(vcr, '%')}
                         </p>
                     </div>
                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">{KPIS['marginal_contribution_amount'].name}</p>
+                        <p className="text-xs text-muted-foreground">{KPIS['marginal_contribution_amount'].name} ({state.analysisMode === 'pop' ? '当周' : '累计'})</p>
                         <p className="text-xs font-medium">{formatKpiValue(contribution, '万元')}</p>
                     </div>
                 </div>
@@ -129,7 +128,7 @@ export default function TrendChart({ data }: TrendChartProps) {
                                 radius={[4, 4, 0, 0]}
                             >
                                 {data.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={getDynamicColorByVCR(entry.ytd_kpis.variable_cost_ratio)} />
+                                    <Cell key={`cell-${index}`} fill={getDynamicColorByVCR(entry[kpiSetKey].variable_cost_ratio)} />
                                 ))}
                             </Bar>
                         </BarChart>
