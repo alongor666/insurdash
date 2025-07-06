@@ -10,6 +10,7 @@ import type { KpiKey, TrendData } from '@/lib/types';
 import { CardDescription } from '@/components/ui/card';
 import { formatKpiValue } from '@/lib/data';
 import { getDynamicColorByVCR } from '@/lib/colors';
+import { useDashboard } from '@/hooks/use-dashboard';
 
 interface TrendChartProps {
     data: TrendData[];
@@ -18,29 +19,35 @@ interface TrendChartProps {
 const chartableKpis = Object.keys(KPIS) as KpiKey[];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
+    const { state } = useDashboard();
     if (active && payload && payload.length) {
         const dataPoint = payload[0].payload;
-        const kpiKey = payload[0].dataKey.replace('kpis.', '') as KpiKey;
+        const dataKey = payload[0].dataKey; // e.g., "ytd_kpis.premium_written"
+        const [kpiSet, kpiKey] = dataKey.split('.') as ['ytd_kpis' | 'pop_kpis', KpiKey];
         const mainKpi = KPIS[kpiKey];
         if (!mainKpi) return null;
+
+        const mainValue = dataPoint[kpiSet][kpiKey];
+        const vcr = dataPoint.ytd_kpis.variable_cost_ratio;
+        const contribution = dataPoint.ytd_kpis.marginal_contribution_amount;
 
         return (
             <div className="rounded-lg border bg-background p-2 shadow-sm">
                 <div className="grid grid-cols-1 gap-2">
                     <p className="text-sm font-bold text-foreground">{dataPoint.period_label}</p>
                     <div className="flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">{mainKpi.name}</p>
-                        <p className="text-xs font-medium">{formatKpiValue(dataPoint.kpis[mainKpi.id], mainKpi.unit)}</p>
+                        <p className="text-xs text-muted-foreground">{mainKpi.name} ({state.analysisMode === 'pop' ? '当周' : '累计'})</p>
+                        <p className="text-xs font-medium">{formatKpiValue(mainValue, mainKpi.unit)}</p>
                     </div>
                     <div className="flex items-center justify-between">
                         <p className="text-xs text-muted-foreground">{KPIS['variable_cost_ratio'].name}</p>
-                        <p className="text-xs font-medium" style={{color: getDynamicColorByVCR(dataPoint.kpis.variable_cost_ratio)}}>
-                            {formatKpiValue(dataPoint.kpis.variable_cost_ratio, '%')}
+                        <p className="text-xs font-medium" style={{color: getDynamicColorByVCR(vcr)}}>
+                            {formatKpiValue(vcr, '%')}
                         </p>
                     </div>
                      <div className="flex items-center justify-between">
                         <p className="text-xs text-muted-foreground">{KPIS['marginal_contribution_amount'].name}</p>
-                        <p className="text-xs font-medium">{formatKpiValue(dataPoint.kpis.marginal_contribution_amount, '万元')}</p>
+                        <p className="text-xs font-medium">{formatKpiValue(contribution, '万元')}</p>
                     </div>
                 </div>
             </div>
@@ -51,11 +58,17 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 
 export default function TrendChart({ data }: TrendChartProps) {
+    const { state: dashboardState } = useDashboard();
+    const { analysisMode } = dashboardState;
+
     const [selectedKpi, setSelectedKpi] = useState<KpiKey>('premium_written');
     const { unit, name, type } = KPIS[selectedKpi];
+    
+    const kpiSetKey = analysisMode === 'ytd' ? 'ytd_kpis' : 'pop_kpis';
+    const dataKey = `${kpiSetKey}.${selectedKpi}`;
 
     const chartConfig = {
-      [selectedKpi]: {
+      [dataKey]: {
         label: name,
       },
     }
@@ -100,7 +113,7 @@ export default function TrendChart({ data }: TrendChartProps) {
                             {commonChartElements}
                             <Line 
                                 type="monotone"
-                                dataKey={`kpis.${selectedKpi}`}
+                                dataKey={dataKey}
                                 name={name}
                                 stroke="hsl(var(--chart-1))"
                                 strokeWidth={2}
@@ -111,12 +124,12 @@ export default function TrendChart({ data }: TrendChartProps) {
                          <BarChart {...chartProps}>
                             {commonChartElements}
                             <Bar 
-                                dataKey={`kpis.${selectedKpi}`}
+                                dataKey={dataKey}
                                 name={name}
                                 radius={[4, 4, 0, 0]}
                             >
                                 {data.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={getDynamicColorByVCR(entry.kpis.variable_cost_ratio)} />
+                                    <Cell key={`cell-${index}`} fill={getDynamicColorByVCR(entry.ytd_kpis.variable_cost_ratio)} />
                                 ))}
                             </Bar>
                         </BarChart>

@@ -104,9 +104,12 @@ export default function DashboardPage() {
           getRawDataForPeriod(state.comparePeriod),
           getRawDataForTrend(state.currentPeriod, 15)
         ]);
-
+        
+        // Pass the period before the compare period for accurate PoP calculation
+        const comparePeriodPreviousRaw = await getRawDataForPeriod(compareRaw[0]?.comparison_period_id_mom || '');
+        
         const processed = processDashboardData(currentRaw, compareRaw, state.selectedBusinessTypes, state.analysisMode);
-        const processedTrendData = processTrendData(trendRaw, state.selectedBusinessTypes, state.analysisMode);
+        const processedTrendData = processTrendData(trendRaw, state.selectedBusinessTypes);
         
         setState(s => ({ ...s, processedData: processed, trendData: processedTrendData }));
       } catch (error) {

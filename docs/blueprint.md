@@ -1,4 +1,4 @@
-# **App Name**: InsurDash 洞察
+# **App Name**: InsurDash
 
 ## Core Features:
 

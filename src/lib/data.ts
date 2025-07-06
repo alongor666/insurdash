@@ -8,6 +8,7 @@ import { KPIS } from "./kpi-config";
 export async function getFilterOptions(): Promise<{ periods: { id: string, name: string }[], businessTypes: string[] }> {
     const supabase = createClient();
     
+    // The query has been updated to use the business_data view which contains all business types per period.
     const { data, error } = await supabase
         .from('business_data')
         .select('period_id, period_label, business_type');
@@ -24,6 +25,7 @@ export async function getFilterOptions(): Promise<{ periods: { id: string, name:
     const periodMap = new Map<string, string>();
     const businessTypeSet = new Set<string>();
 
+    // The data is now a flat list, so we iterate through it to populate periods and business types
     for (const item of data) {
         if (item.period_id && item.period_label) {
             periodMap.set(item.period_id, item.period_label);
@@ -35,7 +37,7 @@ export async function getFilterOptions(): Promise<{ periods: { id: string, name:
 
     const periods = Array.from(periodMap.entries())
         .map(([id, name]) => ({ id, name }))
-        .sort((a, b) => b.id.localeCompare(a.id));
+        .sort((a, b) => b.id.localeCompare(a.id)); // Sort periods descending
     
     const businessTypes = Array.from(businessTypeSet).sort();
     
@@ -56,8 +58,10 @@ export async function getRawDataForPeriod(periodId: string): Promise<RawBusiness
         return [];
     }
     
+    // The view returns one row per business_type, which matches the expected RawBusinessData[] structure.
     return (data as RawBusinessData[]) || [];
 }
+
 
 export async function getRawDataForTrend(
     endPeriodId: string,
@@ -66,6 +70,7 @@ export async function getRawDataForTrend(
     const supabase = createClient();
     if (!endPeriodId) return [];
 
+    // Get all unique, sorted period IDs first
     const { data: allPeriods, error: allPeriodsError } = await supabase
         .from('business_data')
         .select('period_id')
@@ -79,10 +84,12 @@ export async function getRawDataForTrend(
     const startIndex = sortedPeriodIds.indexOf(endPeriodId);
     if(startIndex === -1) return [];
 
+    // We need one extra period to calculate the PoP for the last data point
     const trendPeriodIds = sortedPeriodIds.slice(startIndex, startIndex + count + 1);
 
     if (trendPeriodIds.length === 0) return [];
 
+    // Fetch all data for the required periods in one go
     const { data: trendData, error: trendError } = await supabase
         .from('business_data')
         .select('*')
@@ -102,11 +109,12 @@ export async function getRawDataForTrend(
     }, {} as Record<string, RawBusinessData[]>);
     
     const result = [];
+    // Iterate for 'count' periods to create pairs of (current, previous)
     for(let i = 0; i < count; i++) {
         const currentPeriodId = sortedPeriodIds[startIndex + i];
-        const previousPeriodId = sortedPeriodIds[startIndex + i + 1];
+        const previousPeriodId = sortedPeriodIds[startIndex + i + 1]; // The next oldest period
 
-        if(!currentPeriodId || !previousPeriodId) break;
+        if(!currentPeriodId || !previousPeriodId) break; // Stop if we run out of periods
 
         const current = dataByPeriod[currentPeriodId] || [];
         const previous = dataByPeriod[previousPeriodId] || [];
@@ -114,13 +122,14 @@ export async function getRawDataForTrend(
         if (current.length > 0) {
              result.push({
                 period_id: currentPeriodId,
-                period_label: current[0].period_label,
+                period_label: current[0].period_label, // Get label from the first record
                 current,
                 previous
              })
         }
     }
     
+    // The result is naturally from most recent to least recent, so we reverse it for the chart
     return result.reverse();
 }
 // #endregion
@@ -147,6 +156,7 @@ export function calculateKpis(rawData: RawBusinessData): ProcessedBusinessData['
     kpis.total_loss_amount = total_loss_amount;
     kpis.claim_count = claim_count;
     
+    // For aggregated data, this will be a weighted average. For single lines, it's from raw data.
     kpis.avg_premium_per_policy = avg_premium_per_policy;
     
     kpis.policy_count = safeDivide(premium_written * 10000, kpis.avg_premium_per_policy);
@@ -169,8 +179,10 @@ export function calculateKpis(rawData: RawBusinessData): ProcessedBusinessData['
     
     kpis.marginal_contribution_amount = premium_earned * (kpis.marginal_contribution_ratio / 100);
     
+    // These need total premium to be calculated, will be done in the processing step
     kpis.premium_share = 0; 
     
+    // This is only available for single, non-aggregated business lines
     kpis.avg_commercial_index = rawData.avg_commercial_index || 0;
 
     return kpis;
@@ -179,6 +191,7 @@ export function calculateKpis(rawData: RawBusinessData): ProcessedBusinessData['
 
 function aggregateRawData(data: RawBusinessData[]): RawBusinessData {
     if (data.length === 0) {
+        // Return a zeroed-out RawBusinessData object
         return {
             period_id: '',
             period_label: '',
@@ -211,9 +224,12 @@ function aggregateRawData(data: RawBusinessData[]): RawBusinessData {
         aggregated.total_loss_amount += item.total_loss_amount || 0;
         aggregated.expense_amount_raw += item.expense_amount_raw || 0;
         aggregated.claim_count += item.claim_count || 0;
+
+        // For weighted average of avg_premium_per_policy
         totalPremiumForAvg += (item.avg_premium_per_policy || 0) * (item.premium_written || 0);
     }
 
+    // Calculate weighted average for avg_premium_per_policy
     aggregated.avg_premium_per_policy = safeDivide(totalPremiumForAvg, aggregated.premium_written);
     
     return {
@@ -223,6 +239,7 @@ function aggregateRawData(data: RawBusinessData[]): RawBusinessData {
         business_type: 'Aggregated',
         comparison_period_id_mom: data[0].comparison_period_id_mom,
         totals_for_period: data[0].totals_for_period,
+        // avg_commercial_index is not meaningful when aggregated, except for single business type selection
         avg_commercial_index: data.length === 1 ? data[0].avg_commercial_index : 0,
     };
 }
@@ -247,6 +264,7 @@ function calculatePeriodOverPeriod(current: RawBusinessData[], previous: RawBusi
             total_loss_amount: (currentItem.total_loss_amount || 0) - (previousItem.total_loss_amount || 0),
             expense_amount_raw: (currentItem.expense_amount_raw || 0) - (previousItem.expense_amount_raw || 0),
             claim_count: (currentItem.claim_count || 0) - (previousItem.claim_count || 0),
+            // For PoP, these are non-additive and should be taken from the current period directly
             avg_premium_per_policy: currentItem.avg_premium_per_policy,
             avg_commercial_index: currentItem.avg_commercial_index
         };
@@ -265,13 +283,14 @@ export function processDashboardData(
     const currentFiltered = currentPeriodRawData.filter(d => selectedBusinessTypes.includes(d.business_type));
     const compareFiltered = comparePeriodRawData.filter(d => selectedBusinessTypes.includes(d.business_type));
 
+    // For PoP, we need the period before the current period to calculate the difference.
+    // The comparison data should be from the period before the compare period.
     const currentDataForProcessing = analysisMode === 'ytd' 
         ? currentFiltered
         : calculatePeriodOverPeriod(currentFiltered, compareFiltered);
 
-    const compareDataForProcessing = analysisMode === 'ytd' 
-        ? compareFiltered
-        : [];
+    // The 'compare' data is always calculated in YTD mode for a stable comparison base.
+    const compareDataForProcessing = compareFiltered;
 
     const totalPremiumCurrent = currentPeriodRawData.reduce((sum, item) => sum + (item.premium_written || 0), 0);
     const totalPremiumCompare = comparePeriodRawData.reduce((sum, item) => sum + (item.premium_written || 0), 0);
@@ -279,6 +298,7 @@ export function processDashboardData(
     const byBusinessType = currentDataForProcessing.map(businessLineData => {
         const kpis = calculateKpis(businessLineData);
         kpis.premium_share = safeDivide(kpis.premium_written, totalPremiumCurrent) * 100;
+        // Only show avg_commercial_index for single business type selection in YTD mode
         if (selectedBusinessTypes.length !== 1 || analysisMode === 'pop') {
             kpis.avg_commercial_index = 0;
         }
@@ -296,7 +316,7 @@ export function processDashboardData(
     
     const summaryCompareKpis = calculateKpis(aggregateCompare);
     summaryCompareKpis.premium_share = safeDivide(summaryCompareKpis.premium_written, totalPremiumCompare) * 100;
-     if (selectedBusinessTypes.length !== 1 || analysisMode === 'pop') {
+     if (selectedBusinessTypes.length !== 1) { // This should not depend on analysis mode
         summaryCompareKpis.avg_commercial_index = 0;
     }
 
@@ -309,22 +329,23 @@ export function processDashboardData(
     };
 }
 
-
 export function processTrendData(
     trendRaw: { period_id: string, period_label: string, current: RawBusinessData[], previous: RawBusinessData[] }[],
-    selectedBusinessTypes: string[],
-    analysisMode: 'ytd' | 'pop'
+    selectedBusinessTypes: string[]
 ): TrendData[] {
     if (!trendRaw || trendRaw.length === 0) return [];
     
     return trendRaw.map(periodData => {
-        const processedPeriod = processDashboardData(periodData.current, periodData.previous, selectedBusinessTypes, analysisMode);
+        const ytdProcessed = processDashboardData(periodData.current, [], selectedBusinessTypes, 'ytd');
+        const popProcessed = processDashboardData(periodData.current, periodData.previous, selectedBusinessTypes, 'pop');
+        
         return {
             period_id: periodData.period_id,
             period_label: periodData.period_label,
-            kpis: processedPeriod.summary.current.kpis
+            ytd_kpis: ytdProcessed.summary.current.kpis,
+            pop_kpis: popProcessed.summary.current.kpis,
         };
-    }).filter(p => p.kpis.policy_count > 0); // Filter out empty/bad data points
+    }).filter(p => p.ytd_kpis.policy_count > 0); // Filter out empty/bad data points
 }
 // #endregion
 

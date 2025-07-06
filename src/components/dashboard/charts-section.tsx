@@ -9,6 +9,7 @@ import DonutChart from "./charts/ratio-chart"
 import RankingChart from "./charts/ranking-chart"
 import BubbleChart from "./charts/bubble-chart"
 import ParetoChart from "./charts/pareto-chart"
+import ContributionChart from "./charts/contribution-chart";
 import type { DashboardData, TrendData, KpiKey } from "@/lib/types"
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
@@ -25,27 +26,32 @@ interface ChartsSectionProps {
     trendData: TrendData[];
 }
 
-type ChartTab = "trend" | "donut" | "ranking" | "bubble" | "pareto";
+type ChartTab = "trend" | "donut" | "ranking" | "bubble" | "pareto" | "contribution";
 
 export default function ChartsSection({ processedData, trendData }: ChartsSectionProps) {
   const { state } = useDashboard();
   const [activeTab, setActiveTab] = useState<ChartTab>("trend");
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // State for Donut Chart selectors is lifted here
   const [outerMetric, setOuterMetric] = useState<KpiKey | 'none'>('premium_written');
   const [innerMetric, setInnerMetric] = useState<KpiKey | 'none'>('total_loss_amount');
   
+  const [contributionKpi1, setContributionKpi1] = useState<KpiKey>('premium_written');
+  const [contributionKpi2, setContributionKpi2] = useState<KpiKey>('total_loss_amount');
+
   const chartData = processedData.byBusinessType;
 
   const handleExport = () => {
     setIsModalOpen(true);
   };
   
-  const aiContent = generateAiAnalysisText(activeTab, state, processedData, trendData);
+  const aiContent = generateAiAnalysisText(activeTab, state, processedData, trendData, {
+      kpi1: contributionKpi1,
+      kpi2: contributionKpi2
+  });
 
   const donutChartControls = (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <div className="flex items-center gap-1.5">
         <Label htmlFor="outer-metric" className="text-xs text-muted-foreground whitespace-nowrap">外环:</Label>
         <Select value={outerMetric} onValueChange={(val) => setOuterMetric(val as KpiKey | 'none')}>
@@ -77,16 +83,47 @@ export default function ChartsSection({ processedData, trendData }: ChartsSectio
     </div>
   );
 
+  const contributionChartControls = (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-1.5">
+        <Label htmlFor="contrib-kpi1" className="text-xs text-muted-foreground whitespace-nowrap">指标1:</Label>
+        <Select value={contributionKpi1} onValueChange={(val) => setContributionKpi1(val as KpiKey)}>
+            <SelectTrigger id="contrib-kpi1" className="h-8 w-[140px] text-xs">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+            {DONUT_PARETO_KPI_IDS.map(kpi => (
+                <SelectItem key={kpi} value={kpi}>{KPIS[kpi].name}</SelectItem>
+            ))}
+            </SelectContent>
+        </Select>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Label htmlFor="contrib-kpi2" className="text-xs text-muted-foreground whitespace-nowrap">指标2:</Label>
+        <Select value={contributionKpi2} onValueChange={(val) => setContributionKpi2(val as KpiKey)}>
+            <SelectTrigger id="contrib-kpi2" className="h-8 w-[140px] text-xs">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+            {DONUT_PARETO_KPI_IDS.map(kpi => (
+                <SelectItem key={kpi} value={kpi}>{KPIS[kpi].name}</SelectItem>
+            ))}
+            </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+
   const ChartWrapper = ({ title, description, children, controls }: { title: string, description: string, children: React.ReactNode, controls?: React.ReactNode }) => (
     <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex-1">
                 <CardTitle>{title}</CardTitle>
                 <CardDescription>{description}</CardDescription>
             </div>
-            <div className="flex items-center gap-2 md:gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 md:gap-4">
                 {controls}
-                <Button variant="outline" size="sm" onClick={handleExport} className="shrink-0">
+                <Button variant="outline" size="sm" onClick={handleExport} className="shrink-0 mt-2 sm:mt-0">
                     <Sparkles className="mr-2 h-4 w-4" />
                     AI分析
                 </Button>
@@ -102,8 +139,9 @@ export default function ChartsSection({ processedData, trendData }: ChartsSectio
   return (
     <>
     <Tabs defaultValue={activeTab} onValueChange={(value) => setActiveTab(value as ChartTab)} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 mb-4">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-4">
             <TabsTrigger value="trend">趋势分析</TabsTrigger>
+            <TabsTrigger value="contribution">贡献度分析</TabsTrigger>
             <TabsTrigger value="donut">占比分析</TabsTrigger>
             <TabsTrigger value="ranking">业务分布</TabsTrigger>
             <TabsTrigger value="bubble">多维气泡</TabsTrigger>
@@ -112,6 +150,11 @@ export default function ChartsSection({ processedData, trendData }: ChartsSectio
         <TabsContent value="trend">
             <ChartWrapper title="趋势分析" description="追踪单个核心指标在连续时间周期内的表现。">
                 <TrendChart data={trendData} />
+            </ChartWrapper>
+        </TabsContent>
+        <TabsContent value="contribution">
+            <ChartWrapper title="贡献度分析" description="对比两个指标的当周贡献度 (当周发生值 / 当期累计值) 的变化趋势。" controls={contributionChartControls}>
+                <ContributionChart data={trendData} kpi1={contributionKpi1} kpi2={contributionKpi2} />
             </ChartWrapper>
         </TabsContent>
         <TabsContent value="donut">

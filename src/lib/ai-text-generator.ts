@@ -1,12 +1,17 @@
 import { KPIS, KPI_IDS } from "./kpi-config";
 import { getComparisonMetrics, formatKpiValue } from "./data";
-import type { DashboardData, DashboardState, TrendData } from "./types";
+import type { DashboardData, DashboardState, TrendData, KpiKey } from "./types";
+
+const safeDivide = (numerator: number, denominator: number) => {
+    return denominator !== 0 ? (numerator / denominator) * 100 : 0;
+};
 
 export function generateAiAnalysisText(
     chart: string,
     state: Omit<DashboardState, 'processedData' | 'trendData'>,
     processedData: DashboardData,
-    trendData: TrendData[]
+    trendData: TrendData[],
+    chartSpecificState?: Record<string, any>
 ): string {
 
     const { currentPeriod, comparePeriod, analysisMode, selectedBusinessTypes, periods, businessTypes } = state;
@@ -29,7 +34,7 @@ export function generateAiAnalysisText(
             changeText = "新增";
         } else {
              if (unit === '%') {
-                changeText = `${diff > 0 ? '+' : ''}${formatKpiValue(diff, unit)} p.p. (${percentageChange > 0 ? '+' : ''}${formatKpiValue(percentageChange, '%')})`;
+                changeText = `${diff > 0 ? '+' : ''}${formatKpiValue(diff, 'p.p.')} (${percentageChange > 0 ? '+' : ''}${formatKpiValue(percentageChange, '%')})`;
             } else {
                 changeText = `${diff > 0 ? '+' : ''}${formatKpiValue(diff, unit)} (${percentageChange > 0 ? '+' : ''}${formatKpiValue(percentageChange, '%')})`;
             }
@@ -43,6 +48,7 @@ export function generateAiAnalysisText(
 
     const chartTitles: Record<string, string> = {
         trend: "趋势分析",
+        contribution: "贡献度分析",
         donut: "占比分析",
         ranking: "业务排名",
         bubble: "多维气泡",
@@ -50,18 +56,34 @@ export function generateAiAnalysisText(
     };
     
     const chartTitle = chartTitles[chart] || chart;
+    
+    chartDescription = `这是 "${chartTitle}" 图表所使用的数据明细:`;
 
     if (chart === 'trend' && trendData) {
-        chartDescription = `这是 "${chartTitle}" 图表所使用的历史数据明细:`;
+        const kpiSetKey = analysisMode === 'ytd' ? 'ytd_kpis' : 'pop_kpis';
         const trendKpiHeaders = KPI_IDS.map(id => KPIS[id].name).join(' | ');
         chartDataTable = `| 周期 | ${trendKpiHeaders} |\n`;
         chartDataTable += `|:---|${KPI_IDS.map(() => '---:').join('')}|\n`;
         trendData.forEach(period => {
-            const row = `| ${period.period_label} | ${KPI_IDS.map(id => formatKpiValue(period.kpis[id], KPIS[id].unit)).join(' | ')} |\n`;
+            const row = `| ${period.period_label} | ${KPI_IDS.map(id => formatKpiValue(period[kpiSetKey][id], KPIS[id].unit)).join(' | ')} |\n`;
             chartDataTable += row;
         });
+    } else if (chart === 'contribution' && trendData && chartSpecificState) {
+        const kpi1 = chartSpecificState.kpi1 as KpiKey;
+        const kpi2 = chartSpecificState.kpi2 as KpiKey;
+        const kpi1Name = KPIS[kpi1].name;
+        const kpi2Name = KPIS[kpi2].name;
+
+        chartDataTable = `| 周期 | ${kpi1Name} 当周贡献度 | ${kpi2Name} 当周贡献度 |\n`;
+        chartDataTable += `|:---|---:|---:|\n`;
+        trendData.forEach(period => {
+            const share1 = safeDivide(period.pop_kpis[kpi1], period.ytd_kpis[kpi1]);
+            const share2 = safeDivide(period.pop_kpis[kpi2], period.ytd_kpis[kpi2]);
+            const row = `| ${period.period_label} | ${formatKpiValue(share1, '%')} | ${formatKpiValue(share2, '%')} |\n`;
+            chartDataTable += row;
+        });
+
     } else {
-        chartDescription = `这是 "${chartTitle}" 图表所使用的数据明细:`;
         const businessTypeKpiHeaders = KPI_IDS.map(id => KPIS[id].name).join(' | ');
         chartDataTable = `| 业务线 | ${businessTypeKpiHeaders} |\n`;
         chartDataTable += `|:---|${KPI_IDS.map(() => '---:').join('')}|\n`;
