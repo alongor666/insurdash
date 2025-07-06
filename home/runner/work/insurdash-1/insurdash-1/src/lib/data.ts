@@ -291,41 +291,47 @@ export function processDashboardData({
 }: ProcessDataParams): DashboardData | null {
     const getPeriod = (id: string) => allPeriodData[id]?.filter(d => selectedBusinessTypes.includes(d.business_type)) || [];
     
-    const currentPeriodData = getPeriod(currentPeriodId);
-    if (!currentPeriodData) return null;
-
     let mainData: RawBusinessData[];
-    let compareData: RawBusinessData[];
+    let compareDataForKpi: RawBusinessData[];
     
     const currentPeriodIndex = periods.findIndex(p => p.id === currentPeriodId);
-    const prevPeriodId = currentPeriodIndex > -1 && currentPeriodIndex + 1 < periods.length 
-        ? periods[currentPeriodIndex + 1].id 
-        : undefined;
-
-    const prevPeriodData = prevPeriodId ? getPeriod(prevPeriodId) : [];
-
+    
     if (analysisMode === 'pop') {
+        const prevPeriodId = currentPeriodIndex > -1 && currentPeriodIndex + 1 < periods.length 
+            ? periods[currentPeriodIndex + 1].id 
+            : undefined;
         const prev2PeriodId = currentPeriodIndex > -1 && currentPeriodIndex + 2 < periods.length
             ? periods[currentPeriodIndex + 2].id
             : undefined;
+            
+        const currentPeriodData = getPeriod(currentPeriodId);
+        const prevPeriodData = prevPeriodId ? getPeriod(prevPeriodId) : [];
         const prev2PeriodData = prev2PeriodId ? getPeriod(prev2PeriodId) : [];
 
         mainData = calculatePeriodOverPeriod(currentPeriodData, prevPeriodData);
-        compareData = calculatePeriodOverPeriod(prevPeriodData, prev2PeriodData);
-    } else if (analysisMode === 'ytd') {
-        mainData = currentPeriodData;
-        compareData = prevPeriodData;
-    } else { // 'comparison'
-        mainData = currentPeriodData;
-        compareData = getPeriod(comparePeriodId);
+        compareDataForKpi = calculatePeriodOverPeriod(prevPeriodData, prev2PeriodData);
+
+    } else { // 'ytd' or 'comparison'
+        mainData = getPeriod(currentPeriodId);
+        
+        if (analysisMode === 'ytd') {
+            const prevPeriodId = currentPeriodIndex > -1 && currentPeriodIndex + 1 < periods.length 
+                ? periods[currentPeriodIndex + 1].id 
+                : undefined;
+            compareDataForKpi = prevPeriodId ? getPeriod(prevPeriodId) : [];
+        } else { // 'comparison'
+            compareDataForKpi = getPeriod(comparePeriodId);
+        }
     }
     
+    if (!mainData) return null;
+
     const totalPremiumOverall = (allPeriodData[currentPeriodId] || []).reduce((sum, item) => sum + (item.premium_written || 0), 0);
 
     const byBusinessType = mainData.map(businessLineData => {
         const kpis = calculateKpis(businessLineData);
         const totalPremiumForShare = analysisMode === 'pop' 
-            ? currentPeriodData.reduce((sum, item) => sum + (item.premium_written || 0), 0)
+            ? getPeriod(currentPeriodId).reduce((sum, item) => sum + (item.premium_written || 0), 0)
             : totalPremiumOverall;
         kpis.premium_share = safeDivide(businessLineData.premium_written, totalPremiumForShare) * 100;
         
@@ -336,12 +342,11 @@ export function processDashboardData({
     });
     
     const aggregateCurrent = aggregateRawData(mainData);
-    const aggregateCompare = aggregateRawData(compareData);
+    const aggregateCompare = aggregateRawData(compareDataForKpi);
 
     const summaryCurrentKpis = calculateKpis(aggregateCurrent);
     const summaryCompareKpis = calculateKpis(aggregateCompare);
 
-    // Final adjustments based on mode
     if (selectedBusinessTypes.length !== 1 || analysisMode === 'pop') {
         summaryCurrentKpis.avg_commercial_index = 0;
         summaryCompareKpis.avg_commercial_index = 0;
